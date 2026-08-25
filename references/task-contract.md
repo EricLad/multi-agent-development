@@ -8,6 +8,12 @@ Every Developer receives a bounded task contract from the controller. Keep it co
 
 State the user-visible or architectural outcome this task must achieve.
 
+### Request type
+
+Identify the task as **Feature**, **Bugfix**, **Refactor**, **Performance**, or **Maintenance**.
+
+For Bugfix tasks, also include the current evidence summary and root-cause status. Read `bugfix.md` before assigning implementation.
+
 ### Scope
 
 List the modules/files/interfaces the Developer is expected to own. If exact files are not yet certain, define the subsystem boundary instead.
@@ -18,7 +24,7 @@ Call out nearby refactors, unrelated cleanup, API redesigns, dependency upgrades
 
 ### Relevant exploration context
 
-Provide only the Explorer findings needed for this task: call paths, data ownership, hot-file warnings, dependencies, and known risks.
+Provide only the Explorer or Bug Investigator findings needed for this task: call paths, data ownership, hot-file warnings, dependencies, known risks, reproduction evidence, and established root cause when applicable.
 
 ### Dependencies
 
@@ -33,9 +39,18 @@ State whether this task:
 
 Use observable conditions. Include behavior, compatibility, failure handling, and performance constraints when material.
 
+For Bugfix tasks, acceptance criteria should also state:
+
+- the reported symptom that must no longer occur;
+- the established root cause or the explicitly declared mitigation/hypothesis status;
+- how regression will be verified;
+- any adjacent behavior that must remain unchanged.
+
 ### Validation
 
-Specify the minimum relevant build target, tests, static checks, or manual verification required before handoff.
+Specify the minimum relevant build target, tests, static checks, regression test, stress test, or manual verification required before handoff.
+
+For Bugfix, prefer a regression test that fails before the fix and passes after it whenever practical. If that is infeasible, define the substitute evidence required.
 
 ### Change permissions
 
@@ -46,13 +61,14 @@ Explicitly state whether the Developer may:
 - add or upgrade dependencies;
 - alter build configuration;
 - modify database/schema/protocol formats;
-- make cross-module refactors.
+- make cross-module refactors;
+- add diagnostic logging or instrumentation.
 
 If not stated, the Developer should prefer the narrowest change and escalate material scope expansion to the controller.
 
 ## Developer handoff format
 
-Require the Developer to return:
+Require every Developer to return:
 
 1. implementation summary;
 2. changed and added files;
@@ -61,3 +77,12 @@ Require the Developer to return:
 5. known limitations or residual risks;
 6. deviations from the task contract, if any;
 7. commit/branch/worktree state when applicable.
+
+For Bugfix tasks, additionally require:
+
+8. reported symptom;
+9. root cause;
+10. evidence supporting the root cause;
+11. how the fix breaks the causal chain;
+12. regression verification and result;
+13. precise completion state: **Confirmed fix**, **Mitigation**, **Diagnostic change**, or **Hypothesis-driven fix**.
