@@ -13,6 +13,24 @@ The Developer implements exactly one bounded task contract.
 - Run the required scoped build/tests before handoff.
 - Report failures honestly; never claim validation that was not executed.
 
+## Bugfix responsibilities
+
+For Bugfix tasks, read `bugfix.md` and treat the root-cause statement as part of the implementation contract.
+
+Before claiming the bug is fixed, explain:
+
+- the observed symptom;
+- the root cause and supporting evidence;
+- why the code change breaks the causal chain;
+- how the original defect was regression-verified;
+- any remaining uncertainty or adjacent risk.
+
+Prefer a regression test that fails before the fix and passes after it whenever practical.
+
+Do not present a speculative symptom patch as a confirmed fix. If causal proof remains incomplete, label the result accurately as **Mitigation**, **Diagnostic change**, or **Hypothesis-driven fix**.
+
+Avoid hiding symptoms through retries, sleeps, broad catches, weakened assertions/tests, or defensive guards unless those changes are justified by the actual contract. If a guard is added, state whether it is the causal fix, hardening, or mitigation.
+
 ## Scope changes
 
 If implementation reveals that the task cannot be completed safely within the assigned boundary, stop expanding the change and report:
@@ -22,7 +40,9 @@ If implementation reveals that the task cannot be completed safely within the as
 - the smallest proposed scope adjustment;
 - whether this creates overlap with another worker.
 
-The controller decides whether to expand, reorder, or reassign work.
+For Bugfix work, also report when new evidence contradicts the assigned root-cause hypothesis. Do not continue implementing against a disproven diagnosis merely to finish the task.
+
+The controller decides whether to expand, reorder, reinvestigate, or reassign work.
 
 ## Review response
 
@@ -41,3 +61,5 @@ The controller arbitrates unresolved material disputes.
 ## Handoff
 
 Return the fields defined in `task-contract.md`, with exact validation commands when possible. Keep the handoff factual and concise.
+
+For Bugfix tasks, always include the completion state and the `Symptom / Root Cause / Evidence / Fix / Regression Verification / Residual Risk` summary required by `bugfix.md`.
