@@ -1,4 +1,4 @@
 interface:
   display_name: "Multi-Agent Development"
-  short_description: "用多代理、根因分析、独立审查与 worktree 编排 Codex 开发流程"
-  default_prompt: "Use $multi-agent-development to orchestrate this development or bugfix task from clarification and diagnosis through implementation, independent review, integration, regression verification, and final validation."
+  short_description: "用动态 Agent Pool、多代理、根因分析与独立审查编排 Codex 开发流程"
+  default_prompt: "Use $multi-agent-development to orchestrate this development or bugfix task with dynamic agent-pool scheduling, bounded implementation, independent review, integration, regression verification, and final validation."
