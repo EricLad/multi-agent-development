@@ -1,6 +1,6 @@
 ---
 name: multi-agent-development
-description: Orchestrate software development in Codex with a controller-only main session and specialized subagents for exploration, implementation, independent review, integration review, testing, bug diagnosis, regression verification, and Git worktree-based parallel development. Use when implementing features, fixing bugs, refactoring, optimizing performance, making non-trivial code changes, coordinating multiple coding agents, deciding whether work should be split, using worktrees for parallel implementation, or enforcing independent code-review and integration quality gates.
+description: Orchestrate software development in Codex with a controller-only main session and specialized subagents for exploration, implementation, independent review, integration review, testing, bug diagnosis, regression verification, dynamic agent-pool scheduling, and Git worktree-based parallel development. Use when implementing features, fixing bugs, refactoring, optimizing performance, making non-trivial code changes, coordinating multiple coding agents, deciding whether work should be split, using worktrees for parallel implementation, managing subagent concurrency, or enforcing independent code-review and integration quality gates.
 ---
 
 # Multi-Agent Development
@@ -18,9 +18,10 @@ Use the main conversation as the **Controller / Tech Lead**. The controller owns
 7. Every implementation task must pass its scoped build/tests before review.
 8. Reviewer findings are evidence, not self-executing decisions. The developer may confirm or dispute them with evidence; the controller arbitrates unresolved material findings.
 9. Parallelize only tasks with safe ownership boundaries. Avoid assigning the same hot file or shared API to multiple workers unless dependencies are explicitly ordered.
-10. For complex parallel work, use isolated worktrees/branches. Merge only controller-approved work.
-11. After all complex-task branches are integrated, run an independent **Integration Review** over the complete `BASE_COMMIT..FINAL_HEAD` change and run the project-appropriate full validation suite.
-12. Clean up temporary worktrees/branches only after final acceptance, and never delete user-owned branches or uncommitted work.
+10. Manage parallel subagents through a dynamic **Agent Pool / Concurrency Gate**. Do not hardcode a universal Codex agent limit and do not consume all available capacity with Developers when Reviewers or investigation may need slots.
+11. For complex parallel work, use isolated worktrees/branches. Merge only controller-approved work.
+12. After all complex-task branches are integrated, run an independent **Integration Review** over the complete `BASE_COMMIT..FINAL_HEAD` change and run the project-appropriate full validation suite.
+13. Clean up temporary worktrees/branches only after final acceptance, and never delete user-owned branches or uncommitted work.
 
 ## Model routing
 
@@ -32,6 +33,24 @@ When the exact configurations are available, prefer:
 - Integration Reviewer: **5.6 Luna xhigh**, code-review mode
 
 If an exact model or mode is unavailable, use the closest available capable model while preserving role separation and review independence. State the downgrade once; do not silently change the workflow.
+
+## Agent pool and concurrency
+
+Read `references/agent-pool.md` whenever more than one subagent may be active or the task is decomposed into parallel work.
+
+Do not assume a fixed Codex concurrency limit. If the runtime exposes a concrete limit, schedule against it. If the limit is unknown, start conservatively with at most **3 concurrent implementation Developers**, preserve capacity for Reviewer / Investigator / repair work, and only increase the implementation wave size after higher capacity is actually demonstrated.
+
+Track at least:
+
+- **Active agents** — currently consuming subagent capacity;
+- **Ready queue** — dependency-satisfied activities waiting for a slot;
+- **Blocked queue** — activities waiting on dependencies, shared ownership, review, or decisions.
+
+Treat agent slots and worktrees independently. When a Developer finishes, collect its handoff and release/close its agent thread when supported, but keep its branch/worktree until review, repair, controller acceptance, merge, and cleanup are complete.
+
+Prefer pipelined review over batch review: when one Developer finishes, free its agent slot and start its independent Reviewer when possible while other Developers continue.
+
+If a spawn fails because the runtime agent/thread limit is reached, treat it as a scheduler event: do not duplicate the task, return the activity to the ready queue, release completed agents, reduce the observed concurrency target if needed, and retry only when capacity is available.
 
 ## Request-type routing
 
@@ -74,13 +93,14 @@ Read:
 
 Use this path when the change crosses modules, has uncertain impact, benefits from parallelism, changes shared interfaces/state/lifecycle, carries meaningful regression risk, or requires non-trivial bug diagnosis:
 
-`requirements/evidence -> Explorer or Bug Investigator -> dependency/impact/root-cause analysis -> controller decomposition -> parallel Developers in isolated worktrees when safe -> scoped build/test -> independent per-task Reviewers -> Developer fix/dispute -> controller arbitration -> merge -> Integration Reviewer -> clean/full validation -> controller final review -> cleanup`
+`requirements/evidence -> Explorer or Bug Investigator -> dependency/impact/root-cause analysis -> controller decomposition -> queued parallel Developers in isolated worktrees when safe -> scoped build/test -> pipelined independent per-task Reviewers -> Developer fix/dispute -> controller arbitration -> merge -> Integration Reviewer -> clean/full validation -> controller final review -> cleanup`
 
 Before decomposition, run an exploration-only subagent. For Bugfix tasks, this agent acts as a **Bug Investigator** and must focus on reproduction evidence, causal chain, candidate root causes, and discriminating tests. It must not modify production code.
 
 Read:
 - `references/bugfix.md` for Bugfix tasks.
 - `references/explorer.md` before exploration/investigation.
+- `references/agent-pool.md` before spawning parallel agents or scheduling waves.
 - `references/task-contract.md` before task assignment.
 - `references/worker.md` before development.
 - `references/reviewer.md` before per-task review.
@@ -95,6 +115,10 @@ The controller must:
 - classify the request type and execution complexity;
 - for Bugfix, distinguish observed symptoms from proven root cause and avoid premature fixes;
 - maintain a task/dependency map for complex work;
+- maintain active/ready/blocked agent-pool state when parallel work is used;
+- avoid hardcoding a universal subagent limit and reserve practical capacity for review, investigation, and repair;
+- schedule parallel tasks in dependency-safe waves rather than spawning every decomposed task at once;
+- release completed agent threads when possible without deleting worktrees that still belong to the review/integration lifecycle;
 - record the baseline commit for complex changes before implementation begins;
 - prevent overlapping workers from editing shared hot files without an explicit plan;
 - give every Developer a bounded task contract;
@@ -119,6 +143,8 @@ If a worker fails, stalls, edits outside its task boundary, or cannot validate i
 
 If parallel tasks turn out to have unsafe overlap, stop further parallel modification of the overlapping surface and serialize or refactor the dependency plan.
 
+If the runtime refuses a new subagent because the concurrent agent/thread limit is reached, do not treat the implementation task as failed and do not spawn a duplicate. Release completed agents where possible, queue the activity, lower the observed concurrency target if needed, and continue when capacity becomes available.
+
 If a Bugfix cannot be reproduced, gather alternative evidence such as logs, traces, invariants, failing tests, crash dumps, or a deterministic code-path proof. Do not fabricate reproduction. If the root cause remains unproven, classify the result as mitigation or hypothesis-driven change rather than a confirmed fix.
 
 If the final integration review discovers a defect, route it to the most relevant original Developer when possible, then repeat the necessary review and validation gates.
@@ -137,4 +163,5 @@ Do not declare the work complete until all applicable conditions hold:
 - complex changes are merged successfully;
 - complex changes passed Integration Review;
 - project-appropriate final build/tests/regression checks passed;
+- no required review/repair activity was skipped merely because the agent pool was saturated;
 - temporary worktrees created by this workflow are safely cleaned up.
