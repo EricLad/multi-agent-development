@@ -21,7 +21,7 @@ Use the main conversation as the **Controller / Tech Lead**. The controller owns
 10. Manage parallel subagents through a dynamic **Agent Pool / Concurrency Gate**. Do not hardcode a universal Codex agent limit and do not consume all available capacity with Developers when Reviewers or investigation may need slots.
 11. For complex parallel work, use isolated worktrees/branches. Merge only controller-approved work.
 12. After all complex-task branches are integrated, run an independent **Integration Review** over the complete `BASE_COMMIT..FINAL_HEAD` change and run the project-appropriate full validation suite.
-13. Clean up temporary worktrees/branches only after final acceptance, and never delete user-owned branches or uncommitted work.
+13. Treat cleanup as a mandatory lifecycle gate. For every workflow-created temporary worktree, track its corresponding temporary branch, safely remove the worktree after final acceptance, then safely delete the local task branch and verify both resources are gone. Never delete user-owned or uncertain branches/worktrees automatically.
 
 ## Model routing
 
@@ -68,7 +68,7 @@ The controller should establish, as applicable:
 
 A small diff can still be **Complex** if the bug is intermittent, root cause is unknown, crosses modules, involves concurrency/lifetime/state corruption, has a large blast radius, or is difficult to validate.
 
-An obvious localized defect with a clear causal chain may use the Simple path without a separate exploration phase, but the Developer must still explain the root cause and regression verification.
+An obvious localized defect with a clear causal chain may use the Simple path without a separate investigation phase, but the Developer must still explain the root cause and regression verification.
 
 Do not accept a speculative symptom patch as a completed Bugfix merely because the observed failure disappears once.
 
@@ -93,7 +93,7 @@ Read:
 
 Use this path when the change crosses modules, has uncertain impact, benefits from parallelism, changes shared interfaces/state/lifecycle, carries meaningful regression risk, or requires non-trivial bug diagnosis:
 
-`requirements/evidence -> Explorer or Bug Investigator -> dependency/impact/root-cause analysis -> controller decomposition -> queued parallel Developers in isolated worktrees when safe -> scoped build/test -> pipelined independent per-task Reviewers -> Developer fix/dispute -> controller arbitration -> merge -> Integration Reviewer -> clean/full validation -> controller final review -> cleanup`
+`requirements/evidence -> Explorer or Bug Investigator -> dependency/impact/root-cause analysis -> controller decomposition -> queued parallel Developers in isolated worktrees when safe -> scoped build/test -> pipelined independent per-task Reviewers -> Developer fix/dispute -> controller arbitration -> merge -> Integration Reviewer -> clean/full validation -> controller final review -> mandatory worktree+branch cleanup gate`
 
 Before decomposition, run an exploration-only subagent. For Bugfix tasks, this agent acts as a **Bug Investigator** and must focus on reproduction evidence, causal chain, candidate root causes, and discriminating tests. It must not modify production code.
 
@@ -105,7 +105,7 @@ Read:
 - `references/worker.md` before development.
 - `references/reviewer.md` before per-task review.
 - `references/integration-reviewer.md` before final integration review.
-- `references/quality-and-git.md` before creating, merging, or deleting worktrees/branches.
+- `references/quality-and-git.md` before creating, merging, or deleting worktrees/branches and before declaring cleanup complete.
 
 ## Controller responsibilities
 
@@ -120,6 +120,7 @@ The controller must:
 - schedule parallel tasks in dependency-safe waves rather than spawning every decomposed task at once;
 - release completed agent threads when possible without deleting worktrees that still belong to the review/integration lifecycle;
 - record the baseline commit for complex changes before implementation begins;
+- maintain a workflow-owned Git resource ledger mapping each parallel task to its temporary worktree path, local task branch, integration target, and lifecycle state;
 - prevent overlapping workers from editing shared hot files without an explicit plan;
 - give every Developer a bounded task contract;
 - require concrete build/test evidence rather than accepting "done" claims;
@@ -129,11 +130,13 @@ The controller must:
 - review each task before merge;
 - perform or delegate safe integration and resolve conflicts without silently changing task semantics;
 - require final integration review and project-appropriate validation for complex work;
-- report what changed, what was validated, material residual risks, and any intentionally deferred findings.
+- after final acceptance, process every workflow-owned temporary worktree/branch pair through the cleanup gate in `references/quality-and-git.md`;
+- verify that each temporary worktree is removed and each corresponding workflow-created local branch is deleted, or explicitly retain and report the resource when safe deletion cannot be proven;
+- report what changed, what was validated, material residual risks, intentionally deferred findings, and any retained temporary Git resources with reasons.
 
 ## User interaction
 
-Do not overwhelm the user with internal orchestration details. Ask only when a material product/architecture choice cannot be safely inferred. For long-running multi-agent work, provide concise progress updates at meaningful milestones: exploration/investigation complete, decomposition decided, implementation/review status, integration result, and final validation.
+Do not overwhelm the user with internal orchestration details. Ask only when a material product/architecture choice cannot be safely inferred. For long-running multi-agent work, provide concise progress updates at meaningful milestones: exploration/investigation complete, decomposition decided, implementation/review status, integration result, final validation, and cleanup result.
 
 For Bugfix tasks, clearly distinguish facts from hypotheses. If the root cause remains uncertain, say so rather than presenting a candidate fix as proven.
 
@@ -148,6 +151,8 @@ If the runtime refuses a new subagent because the concurrent agent/thread limit 
 If a Bugfix cannot be reproduced, gather alternative evidence such as logs, traces, invariants, failing tests, crash dumps, or a deterministic code-path proof. Do not fabricate reproduction. If the root cause remains unproven, classify the result as mitigation or hypothesis-driven change rather than a confirmed fix.
 
 If the final integration review discovers a defect, route it to the most relevant original Developer when possible, then repeat the necessary review and validation gates.
+
+If temporary branch cleanup fails, do not use force deletion merely to make the repository look clean. Re-check whether the branch was created by this workflow, whether its worktree is clean and removed, and whether its changes are safely integrated. Prefer `git branch -d` over `git branch -D`. If safe deletion still cannot be proven, retain the branch and report the exact reason.
 
 ## Completion criteria
 
@@ -164,4 +169,4 @@ Do not declare the work complete until all applicable conditions hold:
 - complex changes passed Integration Review;
 - project-appropriate final build/tests/regression checks passed;
 - no required review/repair activity was skipped merely because the agent pool was saturated;
-- temporary worktrees created by this workflow are safely cleaned up.
+- every workflow-created temporary worktree and corresponding local task branch has been either safely deleted and verified absent, or explicitly retained with a concrete safety/audit reason reported to the user.
