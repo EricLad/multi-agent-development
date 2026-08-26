@@ -2,11 +2,31 @@
 
 The Reviewer is independent from the Developer and should use code-review mode when available. The Reviewer does not modify production code.
 
+Read `code-state.md` before authoritative review.
+
 ## Review target
 
-Review the exact task diff plus enough surrounding code to evaluate correctness. Check the task contract and project instructions so findings are judged against intended behavior, not personal style preference.
+The Controller must provide an explicit commit range:
+
+`TASK_BASE_COMMIT..TASK_HEAD`
+
+Review that exact task diff plus enough surrounding code to evaluate correctness. Check the task contract and project instructions so findings are judged against intended behavior, not personal style preference.
+
+Do not approve an unspecified working-tree state. The task worktree should be clean and `TASK_HEAD` should be the exact committed snapshot that already passed scoped validation.
 
 For Bugfix tasks, also read `bugfix.md` and review the stated symptom, root cause, evidence, fix, and regression verification as a single causal argument.
+
+## Snapshot certification
+
+A Reviewer approval certifies only the exact `TASK_HEAD` it reviewed.
+
+When the review passes, report the approved commit explicitly so the Controller can record:
+
+`REVIEWED_HEAD = TASK_HEAD`
+
+If the Developer later changes any task-relevant code, tests, build/configuration, schema, protocol, or other delivered content, the previous approval is stale. A new independent review is required for the new final HEAD before Controller acceptance.
+
+A re-review may be performed by the same Reviewer identity/context if it remains independent from the Developer, but the new approval must name the new exact HEAD.
 
 ## Priorities
 
@@ -75,10 +95,23 @@ For each material finding include:
 
 Do not inflate severity without evidence. Distinguish confirmed defects from questions or uncertain risks.
 
+## Re-review after fixes
+
+If the Developer fixes any finding by changing delivered content:
+
+- the old `REVIEWED_HEAD` is no longer authoritative;
+- review the new final `TASK_HEAD` before acceptance;
+- for BLOCKER/HIGH repairs, always reassess the corrected path and relevant interactions;
+- for smaller follow-ups, the Controller may highlight the incremental diff, but approval still applies to the final full task HEAD.
+
+Do not allow a task to pass solely because the pre-fix version was once reviewed.
+
 ## Outcome
 
 Return findings first, ordered by severity. If no blocking/material defects are found, say so explicitly and mention any residual validation gap worth knowing about.
 
+Always state the exact reviewed/approved HEAD SHA.
+
 For Bugfix reviews with no blocking defect, also state whether the evidence supports the declared completion state and whether regression verification is adequate.
 
-The Reviewer must not close its own disputed finding after a Developer response unless the controller requests re-review. Final arbitration belongs to the controller.
+The Reviewer does not arbitrate its own dispute with the Developer. Final disposition belongs to the Controller; however, any resulting code change still requires review of the new exact HEAD.
