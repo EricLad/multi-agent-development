@@ -1,134 +1,131 @@
-# Task Contract
+# Task Brief and ORCHESTRATED Task Contract
 
-Every Developer receives a bounded task contract from the Controller. Keep it concrete enough to prevent scope drift while leaving implementation details to the Developer when multiple valid approaches exist.
+Use different contract weight by workflow tier.
 
-Read `code-state.md` and `model-routing.md` before assigning implementation work.
+- **FAST**: no delegated task contract; the main session implements directly.
+- **STANDARD**: use a concise task brief.
+- **ORCHESTRATED**: use the full bounded task contract below.
 
-## Required fields
+Do not spend tokens filling fields that do not affect execution.
 
-### Goal
+# STANDARD lightweight task brief
 
-State the user-visible or architectural outcome this task must achieve.
+A STANDARD Developer normally needs only:
 
-### Request type
+- **Goal** — what outcome to produce;
+- **Scope** — subsystem/files or behavior to own;
+- **Out of scope** — only important nearby work to avoid;
+- **Acceptance criteria** — observable success conditions;
+- **Validation** — relevant build/test/check commands or expected verification;
+- **Risk note** — only material risk that changes implementation/review behavior.
 
-Identify the task as **Feature**, **Bugfix**, **Refactor**, **Performance**, or **Maintenance**.
+The Developer is expected to perform their own code exploration inside this scope.
 
-For Bugfix tasks, also include the current evidence summary and root-cause status. Read `bugfix.md` before assigning implementation.
+Do not require ORCHESTRATED Git fields, dependency graphs, model-audit fields, worktree data, or commit-state bookkeeping unless the STANDARD task specifically needs them.
 
-### Role, risk, and model assignment
+A STANDARD handoff should normally contain:
 
-Record the execution tier separately from Simple/Complex classification:
+1. what changed;
+2. files/surfaces changed;
+3. validation performed and result;
+4. notable risk/limitation;
+5. for Bugfix, root cause and regression verification when material.
 
-- `ROLE` — Developer, Bug Investigator, Explorer, Reviewer, or another explicit delegated role;
-- `RISK_LEVEL` — **Low**, **Medium**, **High**, or **Critical**;
-- `ASSIGNED_MODEL` — selected model tier according to `model-routing.md`;
-- `REASONING_EFFORT` — intended reasoning level when configurable;
-- `MODEL_RATIONALE` — required when deviating from the normal role default;
-- `ESCALATION_REASON` — populate if new evidence causes an upgrade during execution.
+# ORCHESTRATED full task contract
 
-Risk classification must consider blast radius and semantic risk, not line count. Security, concurrency/lifetime, persistent data, schema/protocol, compatibility, or broad public-API changes should not be labeled Low merely because the diff is small.
+For ORCHESTRATED work, read `code-state.md` and `model-routing.md` before assignment.
 
-### Scope
+## Goal
 
-List the modules/files/interfaces the Developer is expected to own. If exact files are not yet certain, define the subsystem boundary instead.
+State the user-visible or architectural outcome.
 
-### Out of scope
+## Request type
 
-Call out nearby refactors, unrelated cleanup, API redesigns, dependency upgrades, or other changes that must not be performed without Controller approval.
+Feature, Bugfix, Refactor, Performance, or Maintenance.
 
-### Relevant exploration context
+For a difficult Bugfix, include the current evidence/root-cause status from `bugfix.md`.
 
-Provide only the Explorer or Bug Investigator findings needed for this task: call paths, data ownership, hot-file warnings, dependencies, known risks, reproduction evidence, and established root cause when applicable.
+## Role, risk, and model assignment
 
-### Git base and integration fields
+Record when useful:
 
-For every implementation task record:
+- `ROLE`;
+- `RISK_LEVEL` — Low / Medium / High / Critical;
+- `ASSIGNED_MODEL`;
+- `REASONING_EFFORT`;
+- `MODEL_RATIONALE` when deviating from the role default;
+- `ESCALATION_REASON` if upgraded during execution.
 
-- `BASE_REF` — branch/ref used to create the task branch/worktree;
-- `TASK_BASE_COMMIT` — immutable commit resolved from that base at task start;
-- `PREDECESSORS` — task IDs/accepted commits that must already be present;
-- `INTEGRATION_TARGET` — where the accepted task will be integrated; for Complex work this should normally be the workflow staging branch, not the user's target branch.
+## Scope
 
-A dependent task must not start until its required predecessor outputs are accepted and available in its chosen base.
+Define the module/file/interface ownership boundary.
 
-Do not silently change the task base after implementation begins. If the base must change materially, the Controller must record the new state and invalidate/re-run affected validation/review gates.
+## Out of scope
 
-### Dependencies
+List meaningful nearby refactors, API redesigns, dependency upgrades, or other changes that require Controller approval.
 
-State whether this task:
+## Relevant orchestration context
 
-- can start immediately;
-- depends on another accepted task/commit;
-- provides an API or artifact consumed by another task;
-- must not edit a shared hot file until another task completes;
-- must be integrated before/after another task.
+Provide only what this Developer needs from Explorer/Bug Investigator output: dependencies, hot-file warnings, shared APIs, known risks, or established root-cause evidence.
 
-### Acceptance criteria
+Do not paste a large Explorer report when the Developer can read the implementation surface directly.
 
-Use observable conditions. Include behavior, compatibility, failure handling, and performance constraints when material.
+## Git base and dependencies
 
-For Bugfix tasks, acceptance criteria should also state:
+Record:
 
-- the reported symptom that must no longer occur;
-- the established root cause or explicitly declared mitigation/hypothesis status;
-- how regression will be verified;
-- adjacent behavior that must remain unchanged.
+- `BASE_REF`;
+- `TASK_BASE_COMMIT`;
+- `PREDECESSORS`;
+- `INTEGRATION_TARGET` — normally staging.
 
-### Validation
+A dependent task must not start until required predecessor outputs are accepted and present in its base.
 
-Specify the minimum relevant build target, tests, static checks, regression test, stress test, or manual verification required before handoff.
+## Acceptance criteria
 
-Validation must be performed against the final committed `TASK_HEAD`, not an older working-tree snapshot.
+Use observable conditions covering behavior, compatibility, failure handling, and performance when material.
 
-For Bugfix, prefer a regression test that fails before the fix and passes after it whenever practical. If infeasible, define the substitute evidence required.
+For Bugfix include the symptom/root-cause state and regression expectation.
 
-### Change permissions
+## Validation
 
-Explicitly state whether the Developer may:
+Specify the minimum relevant build target, tests, regression/stress checks, static/lint checks, or manual verification.
 
-- add new files;
-- change public APIs;
-- add or upgrade dependencies;
-- alter build configuration;
-- modify database/schema/protocol formats;
-- make cross-module refactors;
-- add diagnostic logging or instrumentation.
+For ORCHESTRATED work, validation applies to the final committed `TASK_HEAD`.
 
-If not stated, the Developer should prefer the narrowest change and escalate material scope expansion to the Controller.
+## Change permissions
 
-## Developer handoff gate
+Explicitly state permissions only where ambiguity is risky, such as:
 
-The handoff is not valid until:
+- public API changes;
+- dependencies;
+- build configuration;
+- schema/protocol/serialization;
+- cross-module refactors;
+- diagnostic instrumentation.
 
-1. all intended task changes are committed;
-2. the task working tree is clean;
+## ORCHESTRATED Developer handoff
+
+Before handoff:
+
+1. all intended changes are committed;
+2. task worktree is clean;
 3. `TASK_HEAD = HEAD` is recorded;
-4. required scoped validation passed on that exact commit;
+4. required validation passes on that exact commit;
 5. `VALIDATED_HEAD = TASK_HEAD` is recorded.
 
-Require every Developer to return:
+Return:
 
-1. implementation summary;
-2. changed and added files;
-3. important design decisions;
-4. `RISK_LEVEL`, `ASSIGNED_MODEL`, and any `ESCALATION_REASON`;
-5. `BASE_REF` and `TASK_BASE_COMMIT`;
-6. `TASK_HEAD` commit SHA;
-7. confirmation that the task working tree is clean;
-8. build/test/check commands and results;
-9. `VALIDATED_HEAD` SHA;
-10. known limitations or residual risks;
-11. deviations from the task contract, if any;
-12. branch/worktree state when applicable.
+- implementation summary;
+- changed/added files;
+- important design decisions;
+- `TASK_BASE_COMMIT` and `TASK_HEAD`;
+- clean worktree confirmation;
+- validation commands/results and `VALIDATED_HEAD`;
+- limitations/residual risks;
+- contract deviations;
+- branch/worktree state.
 
-For Bugfix tasks, additionally require:
+For difficult Bugfix work also return Symptom, Root Cause, Evidence, Fix, Regression Verification, Residual Risk, and precise completion state.
 
-13. reported symptom;
-14. root cause;
-15. evidence supporting the root cause;
-16. how the fix breaks the causal chain;
-17. regression verification and result;
-18. precise completion state: **Confirmed fix**, **Mitigation**, **Diagnostic change**, or **Hypothesis-driven fix**.
-
-The Controller must reject a handoff whose intended code is uncommitted, whose worktree is dirty, or whose validation does not certify the reported final `TASK_HEAD`.
+The Controller rejects an ORCHESTRATED handoff whose intended code is uncommitted, whose worktree is dirty, or whose validation does not certify the final reported `TASK_HEAD`.
