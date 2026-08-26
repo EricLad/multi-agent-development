@@ -1,4 +1,4 @@
 interface:
   display_name: "Multi-Agent Development"
-  short_description: "用提交快照、动态 Agent Pool、独立审查与 staging 编排 Codex 开发"
-  default_prompt: "Use $multi-agent-development to orchestrate this development or bugfix task with commit-bound validation and review, dynamic agent-pool scheduling, staging integration, regression verification, and safe Git cleanup."
+  short_description: "用风险自适应模型、提交快照、Agent Pool 与 staging 编排 Codex 开发"
+  default_prompt: "Use $multi-agent-development to orchestrate this development or bugfix task with role-and-risk adaptive model routing, commit-bound validation and review, dynamic agent-pool scheduling, staging integration, regression verification, and safe Git cleanup."
