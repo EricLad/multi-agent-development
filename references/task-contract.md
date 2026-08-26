@@ -2,7 +2,7 @@
 
 Every Developer receives a bounded task contract from the Controller. Keep it concrete enough to prevent scope drift while leaving implementation details to the Developer when multiple valid approaches exist.
 
-Read `code-state.md` before assigning implementation work.
+Read `code-state.md` and `model-routing.md` before assigning implementation work.
 
 ## Required fields
 
@@ -15,6 +15,19 @@ State the user-visible or architectural outcome this task must achieve.
 Identify the task as **Feature**, **Bugfix**, **Refactor**, **Performance**, or **Maintenance**.
 
 For Bugfix tasks, also include the current evidence summary and root-cause status. Read `bugfix.md` before assigning implementation.
+
+### Role, risk, and model assignment
+
+Record the execution tier separately from Simple/Complex classification:
+
+- `ROLE` — Developer, Bug Investigator, Explorer, Reviewer, or another explicit delegated role;
+- `RISK_LEVEL` — **Low**, **Medium**, **High**, or **Critical**;
+- `ASSIGNED_MODEL` — selected model tier according to `model-routing.md`;
+- `REASONING_EFFORT` — intended reasoning level when configurable;
+- `MODEL_RATIONALE` — required when deviating from the normal role default;
+- `ESCALATION_REASON` — populate if new evidence causes an upgrade during execution.
+
+Risk classification must consider blast radius and semantic risk, not line count. Security, concurrency/lifetime, persistent data, schema/protocol, compatibility, or broad public-API changes should not be labeled Low merely because the diff is small.
 
 ### Scope
 
@@ -99,22 +112,23 @@ Require every Developer to return:
 1. implementation summary;
 2. changed and added files;
 3. important design decisions;
-4. `BASE_REF` and `TASK_BASE_COMMIT`;
-5. `TASK_HEAD` commit SHA;
-6. confirmation that the task working tree is clean;
-7. build/test/check commands and results;
-8. `VALIDATED_HEAD` SHA;
-9. known limitations or residual risks;
-10. deviations from the task contract, if any;
-11. branch/worktree state when applicable.
+4. `RISK_LEVEL`, `ASSIGNED_MODEL`, and any `ESCALATION_REASON`;
+5. `BASE_REF` and `TASK_BASE_COMMIT`;
+6. `TASK_HEAD` commit SHA;
+7. confirmation that the task working tree is clean;
+8. build/test/check commands and results;
+9. `VALIDATED_HEAD` SHA;
+10. known limitations or residual risks;
+11. deviations from the task contract, if any;
+12. branch/worktree state when applicable.
 
 For Bugfix tasks, additionally require:
 
-12. reported symptom;
-13. root cause;
-14. evidence supporting the root cause;
-15. how the fix breaks the causal chain;
-16. regression verification and result;
-17. precise completion state: **Confirmed fix**, **Mitigation**, **Diagnostic change**, or **Hypothesis-driven fix**.
+13. reported symptom;
+14. root cause;
+15. evidence supporting the root cause;
+16. how the fix breaks the causal chain;
+17. regression verification and result;
+18. precise completion state: **Confirmed fix**, **Mitigation**, **Diagnostic change**, or **Hypothesis-driven fix**.
 
 The Controller must reject a handoff whose intended code is uncommitted, whose worktree is dirty, or whose validation does not certify the reported final `TASK_HEAD`.
