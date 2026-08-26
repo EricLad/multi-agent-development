@@ -2,7 +2,9 @@
 
 [中文](#中文) · [English](#english)
 
-A multi-agent software development workflow for Codex with commit-bound quality gates, dynamic agent scheduling, staging integration, and risk-adaptive model routing.
+A progressive multi-agent software development workflow for Codex.
+
+> **Use the lightest process that is sufficient for the task.** Small changes stay fast; full multi-agent orchestration is reserved for work that actually benefits from it.
 
 ---
 
@@ -10,358 +12,269 @@ A multi-agent software development workflow for Codex with commit-bound quality 
 
 ## 简介
 
-`multi-agent-development` 是一个面向 **Codex** 的多代理软件开发 Skill。
+`multi-agent-development` 是一个面向 **Codex** 的软件开发 Skill。
 
-核心原则是：**主会话作为 Controller / Tech Lead，负责需求、风险判断、任务拆分、模型路由、Agent 调度、Review 裁决、Git 集成和最终验收；生产代码交给独立子代理实现。**
+新版核心原则不是“所有代码修改都走完整多代理流程”，而是：
 
-它适用于：
+> **小事别折腾，大事再上流程；谁负责改代码，谁就自己先看代码。**
 
-- Feature 开发；
-- Bug 修复；
-- Refactor；
-- Performance 优化；
-- Maintenance；
-- 多 worktree 并行开发；
-- 需要独立 Review、Integration Review 和严格 Git 生命周期控制的代码修改。
-
-## 核心角色
-
-| 角色 | 职责 | 默认模型路由 |
-| --- | --- | --- |
-| Controller / Tech Lead | 需求、复杂度/风险判断、调度、裁决、集成、最终验收 | 当前主会话 |
-| Explorer | 只读探索、调用链、依赖、hot files、验证地图 | **Luna max** |
-| Bug Investigator | 根因调查、证据、候选原因、判别测试 | Luna max 起步，复杂时 Terra xhigh/max |
-| Developer | 在 Task Contract 内实现并验证生产代码 | **Terra xhigh 默认**；低风险可 Luna max；高风险 Terra max |
-| Reviewer | 独立审查单个 Task 的精确 commit diff | **Luna max**；高风险/争议升级 Terra xhigh |
-| Integration Reviewer | 审查 staging 上完整集成结果 | **Terra xhigh**；高风险升级 Terra max |
-| Critical Escalation | 极高风险或长期无法收敛的困难任务 | **Sol xhigh/max** |
-
-模型不存在或 reasoning effort 不可选时，Skill 会要求使用最接近的可用能力层级，同时保留角色独立性和质量门。
-
-## Role + Risk Adaptive Model Routing
-
-这个 Skill **不再把某个角色永远固定到同一个模型**。
-
-模型选择由两个维度决定：
+Skill 会从三档工作流中选择最轻且足够安全的一档：
 
 ```text
-Role
-+
-Risk Level
-↓
-Assigned Model
+FAST
+STANDARD
+ORCHESTRATED
 ```
 
-风险等级独立于 Simple / Complex：
+## 最重要的设计原则
 
-```text
-Low
-Medium
-High
-Critical
-```
+### Exploration 必须存在，但 Explorer 不是必需的
 
-例如：
+AI 编码本身就需要搜索、阅读、理解代码。
 
-- 一个只有 1 行的鉴权修改，结构上可能是 Simple，但风险仍然可以是 High；
-- 一个 Complex 任务中的普通代码搜索/依赖整理，仍然可以使用 Luna max；
-- 一个普通生产功能 Developer 默认使用 Terra xhigh；
-- 并发、生命周期、持久化、协议、安全等高风险修改自动倾向 Terra max。
-
-### 默认路由
+因此普通任务不再这样：
 
 ```text
 Explorer
-→ Luna max
-
-Bug Investigator
-→ Luna max
-→ Terra xhigh
-→ Terra max
-→ Sol xhigh/max（Critical / 长期不收敛）
-
-Developer
-→ Luna max   （Low-risk / bounded / mechanical）
-→ Terra xhigh（默认生产代码）
-→ Terra max  （High-risk）
-→ Sol        （Critical）
-
-Reviewer
-→ Luna max
-→ Terra xhigh（High/Critical / 重大争议）
-
-Integration Reviewer
-→ Terra xhigh
-→ Terra max  （High-risk integration）
-→ Sol        （Critical / unresolved）
+  ↓
+输出分析
+  ↓
+Developer 重新读代码
+  ↓
+实现
 ```
 
-### 自动升级条件
-
-当出现以下情况时，Controller 会考虑升级一个能力层级：
-
-- Root Cause 长时间无法建立；
-- 多个候选原因无法有效区分；
-- 多轮实现/Test 失败但没有收敛；
-- 出现意外跨模块耦合或 hot-file 冲突；
-- Reviewer 发现架构级不确定性；
-- Developer / Reviewer 出现无法可靠裁决的重要争议；
-- 验证出现偶发或非局部失败；
-- merge / target drift 让最终集成状态显著复杂化；
-- 实际风险高于初始分类。
-
-升级是质量控制机制，不是因为任务“写得长”。
-
-## Simple Task
+而是：
 
 ```text
-Preflight
-    ↓
-Risk / Model Assignment
-    ↓
-Temporary Task Branch
-    ↓
 Developer
-    ↓
-Commit All Changes
-    ↓
-Working Tree Clean
-    ↓
-Scoped Validation on TASK_HEAD
-    ↓
-Independent Reviewer
-    ↓
-Repair / Dispute
-    ↓
-Revalidate + Re-review if HEAD changed
-    ↓
-Controller Accepts Exact HEAD
-    ↓
+  ↓
+自己搜索 / 阅读 / 理解
+  ↓
+直接实现
+```
+
+只有当 Controller 需要知道**如何拆分多个任务、谁依赖谁、哪些文件会冲突、哪些任务能并行**时，才单独启动 Explorer。
+
+一句话：
+
+> **Exploration is mandatory; Explorer is optional.**
+
+## FAST
+
+适合局部、明确、低风险、容易验证的小修改。
+
+例如：
+
+- 改几个局部逻辑点；
+- 增加一个简单 UI / 配置项；
+- 修改少量字段；
+- 一个明显且确定的简单 Bug；
+- 几十行左右的普通局部修改。
+
+流程：
+
+```text
+主 Codex
+  ↓
+搜索 / 阅读相关代码
+  ↓
+直接修改
+  ↓
+Targeted Build / Test
+  ↓
+检查最终 Diff
+  ↓
+完成
+```
+
+FAST 默认：
+
+- 主会话可以直接修改生产代码；
+- 不创建 Explorer；
+- 不创建 Developer 子代理；
+- 不强制 Reviewer；
+- 不创建 Agent Pool；
+- 不创建 worktree / staging；
+- 不强制临时分支；
+- 不执行完整 SHA 状态机。
+
+如果实现过程中发现范围或风险比预期大，则升级到 STANDARD / ORCHESTRATED。
+
+## STANDARD
+
+适合比小改动复杂，但仍然应该由**一个 Developer 从头到尾负责**的任务。
+
+流程：
+
+```text
+Controller
+  ↓
+简短 Task Brief
+  ↓
+Developer
+  ├─ 自己探索代码
+  ├─ 自己实现
+  └─ 自己验证
+  ↓
+必要时 Independent Reviewer
+  ↓
+Controller Final Check
+```
+
+STANDARD 默认：
+
+- 不单独启动 Explorer；
+- Developer 自己完成探索 + 实现；
+- 使用轻量 Task Brief；
+- 不使用 Agent Pool；
+- 不使用 staging；
+- 不默认创建 worktree；
+- 不强制完整 `TASK_HEAD / VALIDATED_HEAD / REVIEWED_HEAD / ACCEPTED_HEAD` 状态机；
+- Reviewer 按风险决定是否启用，而不是一刀切。
+
+适合 Review 的情况包括：中高风险、公共行为/API、错误处理、持久化、并发/生命周期、安全、测试覆盖较弱或 Developer 明确存在不确定性。
+
+## ORCHESTRATED
+
+只有真正需要治理和并行价值时才启用完整多代理流程。
+
+典型情况：
+
+- 多个 Developer 可以安全并行；
+- 跨多个耦合模块；
+- 需要 Dependency / Hot-file Map；
+- 高风险或大影响面；
+- 复杂并发 / 生命周期 / 数据 / 协议修改；
+- Bug 根因未知、偶发、难复现；
+- 需要严格 worktree、staging 和 Integration Review。
+
+流程：
+
+```text
+Controller
+  ↓
+Explorer / Bug Investigator（仅必要时）
+  ↓
+Dependency / Ownership Plan
+  ↓
+Task A / B / C
+  ↓
+Agent Pool + Worktrees（有并行时）
+  ↓
+Developers
+  ↓
+Per-task Validation + Independent Review
+  ↓
+Staging
+  ↓
+Full Validation
+  ↓
+Integration Reviewer
+  ↓
 Promote to User Target
-    ↓
+  ↓
 Cleanup
 ```
 
-只有满足：
+只有这档默认启用：
+
+- Agent Pool；
+- 多 worktree / task branches；
+- Git Resource Ledger；
+- Commit-bound SHA 状态机；
+- staging branch；
+- per-task independent review；
+- Integration Review；
+- 完整 cleanup gate。
+
+## Explorer 到底什么时候用？
+
+Explorer 的价值不是“替 Developer 先看一遍代码”，而是帮助 Controller **安全拆任务**。
+
+它应该回答：
 
 ```text
-TASK_HEAD
-== VALIDATED_HEAD
-== REVIEWED_HEAD
-== ACCEPTED_HEAD
+哪些子系统受影响？
+谁负责哪块？
+哪些文件是 Hot Files？
+Task A 是否依赖 Task B？
+哪些任务可以并行？
+最终按什么顺序集成？
 ```
 
-才允许进入目标分支。
+不需要替 Developer 写一份完整实现教程。
 
-## Complex Task
+如果只需要一个 Developer，就通常不需要 Explorer。
+
+## Bugfix
+
+### 简单 Bug
 
 ```text
-Preflight
-    ↓
-Explorer / Bug Investigator
-    ↓
-Dependency + Risk + Hot-file Map
-    ↓
-Workflow Staging Branch
-    ↓
-Agent Pool / Concurrency Gate
-    ↓
-Task Developers in Worktrees
-    ↓
-Commit-bound Validation
-    ↓
-Independent per-task Reviewers
-    ↓
-Repair / Re-review / Model Escalation
-    ↓
-Controller Accepts Exact Task HEADs
-    ↓
-Merge ACCEPTED_HEADs into Staging
-in dependency/topological order
-    ↓
-Clean Build / Full Tests
-    ↓
-Integration / Regression Checks
-    ↓
-Integration Reviewer
-    ↓
-Repair + Re-certification if needed
-    ↓
-Target Drift Reconciliation
-    ↓
-Promote Certified Staging to User Target
-    ↓
-Mandatory Cleanup
+同一个编码上下文
+→ 查代码
+→ 找到原因
+→ 修
+→ 回归验证
 ```
 
-Complex 模式不会在中途把未经最终集成验证的 Task 直接合入用户目标分支。
-
-最终必须：
+### 普通 Bug
 
 ```text
-STAGING_HEAD
-== STAGING_VALIDATED_HEAD
-== STAGING_REVIEWED_HEAD
+一个 Developer
+→ 自己调查
+→ 自己实现
+→ 验证
+→ 必要时 Review
 ```
 
-## Commit-bound Quality Gates
+### 难 Bug
 
-这个 Skill 的 Build/Test/Review 不是认证“Task”，而是认证**具体 commit**。
-
-每个 Task 维护：
+根因本身就是独立难题时，才使用 Bug Investigator：
 
 ```text
-TASK_BASE_COMMIT
-TASK_HEAD
-VALIDATED_HEAD
-REVIEWED_HEAD
-ACCEPTED_HEAD
-```
-
-如果 Reviewer 审的是 A，但 Developer 修复后产生 B：
-
-```text
-REVIEWED_HEAD = A
-TASK_HEAD = B
-```
-
-则旧 Review 自动失效，B 必须重新 Validation + Review。
-
-同样，如果代码在 Test PASS 后再次修改，旧 Validation 也自动失效。
-
-## Bugfix Workflow
-
-Bug 修复要求区分：
-
-```text
-Symptom
-Root Cause
-Evidence
-Fix
-Regression Verification
-Residual Risk
-```
-
-对于复杂 Bug：
-
-```text
-Bug Symptom / Evidence
-    ↓
 Bug Investigator
-    ↓
-Reproduction / Evidence
-    ↓
-Candidate Root Causes
-    ↓
-Discriminating Checks
-    ↓
-Root Cause Conclusion
-    ↓
-Developer Fix
-    ↓
-Regression Verification
-    ↓
-Independent Review
+→ Evidence / Candidate Causes / Root Cause
+→ Developer
+→ Fix
+→ Regression Verification
 ```
 
-最终结果必须准确声明为：
+## 模型路由
 
-- `Confirmed fix`
-- `Mitigation`
-- `Diagnostic change`
-- `Hypothesis-driven fix`
+模型路由只在**真的使用子代理时**生效。
 
-不能因为“症状暂时没出现”就自动声明 Bug 已确认修复。
+- FAST：直接使用当前主会话模型，不为了模型路由额外创建 Agent；
+- STANDARD：通常一个 Developer，按实际风险选择模型；Reviewer 仅必要时启动；
+- ORCHESTRATED：使用完整 Role + Risk Adaptive Routing。
 
-## Agent Pool / 并发调度
+当前建议：
 
-Skill 不把 Codex 最大子代理数写死成 3、4 或 6。
+| 角色 | 默认/建议 |
+| --- | --- |
+| Explorer | Luna max |
+| Bug Investigator | Luna max → Terra xhigh/max，必要时 Sol |
+| Developer | 低风险 Luna max；普通生产代码 Terra xhigh；高风险 Terra max |
+| Reviewer | Luna max；高风险/争议 Terra xhigh |
+| Integration Reviewer | Terra xhigh；高风险 Terra max |
 
-Controller 维护：
+## 为什么这样更快？
+
+因为新版避免了小任务中的重复上下文成本：
 
 ```text
-Active Agents
-Ready Queue
-Blocked Queue
+旧：Controller 看一遍
+    → Explorer 看一遍
+    → Developer 再看一遍
+    → Reviewer 再看一遍
+
+新 FAST：主会话看一次并直接完成
+
+新 STANDARD：Developer 看一次并直接完成
 ```
 
-当并发上限未知时，默认先使用最多 **3 个并发 implementation Developers**，同时保留 Reviewer / Investigator / Repair 的容量；实际环境证明支持更多且任务能安全并行后，再谨慎扩容。
-
-Agent slot 与 Worktree 生命周期分离：Developer 完成后可以释放 agent slot，但对应 branch/worktree 必须保留到 Review、修复、集成和最终 Cleanup 完成。
-
-## Git / Worktree Safety
-
-Complex 模式使用 workflow-owned staging branch，用户目标分支保持 last-known-good，直到最终 staging 通过完整认证。
-
-Skill 维护统一 **Git Resource Ledger**，记录：
-
-- Task branch；
-- Worktree；
-- Simple 临时 branch；
-- Staging branch；
-- ownership；
-- base / predecessor / integration target；
-- lifecycle state。
-
-最终每个 workflow-created Git resource 必须：
-
-```text
-Deleted
-```
-
-或：
-
-```text
-Retained with reason
-```
-
-不会只删除 worktree 而静默遗留 task branch。
-
-## 安装
-
-Codex 用户级 Skill 默认位于 `$CODEX_HOME/skills`；未设置 `CODEX_HOME` 时通常是 `~/.codex/skills`。
-
-### Windows PowerShell
-
-```powershell
-git clone https://github.com/EricLad/multi-agent-development.git "$env:USERPROFILE\.codex\skills\multi-agent-development"
-```
-
-设置了 `CODEX_HOME`：
-
-```powershell
-git clone https://github.com/EricLad/multi-agent-development.git "$env:CODEX_HOME\skills\multi-agent-development"
-```
-
-### Linux / macOS
-
-```bash
-git clone https://github.com/EricLad/multi-agent-development.git ~/.codex/skills/multi-agent-development
-```
-
-安装后如果未立即发现 Skill，请重新启动 Codex。
-
-## 更新
-
-```bash
-git pull
-```
-
-## 使用
-
-开发功能：
-
-```text
-$multi-agent-development
-给用户管理模块增加批量禁用功能。按风险选择合适模型，复杂任务使用 worktree、独立 Review、staging 和最终 Integration Review。
-```
-
-修复 Bug：
-
-```text
-$multi-agent-development
-程序偶尔在关闭用户会话时崩溃。先判断复杂度和风险；如果根因不明确，先调查 Root Cause，必要时升级模型，再进行修复、Regression Verification 和独立 Review。
-```
+复杂治理机制仍然保留，但只在它的风险收益大于协调成本时启用。
 
 ## 项目结构
 
@@ -385,11 +298,40 @@ multi-agent-development/
     └── worker.md
 ```
 
-其中 `model-routing.md` 专门定义 Role + Risk 模型路由、风险等级以及自动升级规则；`code-state.md` 定义 commit-bound 状态机；`quality-and-git.md` 定义 staging、validation、promotion 和 cleanup。
+Heavy references are intended to be loaded only when their phase/tier applies.
 
-## 与项目 `AGENTS.md` 的关系
+## 安装
 
-`multi-agent-development` 定义通用的多代理工程流程；项目自己的 `AGENTS.md` 继续作为项目级语言、构建、测试和架构约束。
+### Windows PowerShell
+
+```powershell
+git clone https://github.com/EricLad/multi-agent-development.git "$env:USERPROFILE\.codex\skills\multi-agent-development"
+```
+
+如果设置了 `CODEX_HOME`：
+
+```powershell
+git clone https://github.com/EricLad/multi-agent-development.git "$env:CODEX_HOME\skills\multi-agent-development"
+```
+
+### Linux / macOS
+
+```bash
+git clone https://github.com/EricLad/multi-agent-development.git ~/.codex/skills/multi-agent-development
+```
+
+更新：
+
+```bash
+git pull
+```
+
+## 使用
+
+```text
+$multi-agent-development
+帮我修改这个功能。优先选择最轻量的工作流，只有确实需要时才升级为多代理并行流程。
+```
 
 ## License
 
@@ -401,104 +343,80 @@ MIT License. See [LICENSE](./LICENSE).
 
 ## Overview
 
-`multi-agent-development` is a multi-agent software development Skill for **Codex**. The main session acts as the Controller / Tech Lead while specialized subagents perform exploration, implementation, bug investigation, independent review, and integration review.
+`multi-agent-development` is a progressive software-development Skill for Codex.
 
-The workflow combines:
+Its key rule is:
 
-- role + risk adaptive model routing;
-- dynamic Agent Pool scheduling;
-- commit-bound validation and review;
-- independent Developer / Reviewer contexts;
-- root-cause-driven bug fixing;
-- worktree-based parallel development;
-- staging integration before the user target branch;
-- mandatory Git cleanup.
+> **Use the lightest workflow that is sufficient for the task.**
 
-## Adaptive model routing
+It provides three tiers:
 
-Default routing when available:
+- **FAST** — main session explores, edits, validates, and inspects the diff directly;
+- **STANDARD** — one Developer owns exploration + implementation + validation, with independent review only when justified;
+- **ORCHESTRATED** — full multi-agent/worktree/staging/review workflow for complex, parallel, high-risk, or difficult diagnostic work.
 
-| Role | Default / escalation |
-| --- | --- |
-| Explorer | Luna max |
-| Bug Investigator | Luna max -> Terra xhigh -> Terra max -> Sol for Critical/unresolved work |
-| Developer | Luna max for Low-risk bounded work; Terra xhigh by default; Terra max for High risk; Sol for Critical work |
-| Reviewer | Luna max; Terra xhigh for High/Critical risk or material uncertainty |
-| Integration Reviewer | Terra xhigh; Terra max for High-risk integration; Sol for Critical/unresolved integration |
+## Exploration policy
 
-Risk is independent from Simple/Complex classification. A tiny security, lifetime, persistence, or protocol change can still require a high-tier model.
+Code exploration is a natural part of coding-agent work. A separate Explorer is not the default.
 
-## Commit-bound acceptance
+Use an Explorer only when the Controller needs a global map for decomposition, ownership, hot files, dependencies, parallelization, or integration order.
 
-Per task:
+**Exploration is mandatory; Explorer is optional.**
+
+## FAST
 
 ```text
-TASK_HEAD == VALIDATED_HEAD == REVIEWED_HEAD == ACCEPTED_HEAD
+main session
+→ search/read
+→ edit
+→ targeted validation
+→ inspect diff
+→ done
 ```
 
-Complex staging:
+No required subagents, Reviewer, Agent Pool, worktree, staging, temporary branch, or commit-state machine.
+
+## STANDARD
 
 ```text
-STAGING_HEAD == STAGING_VALIDATED_HEAD == STAGING_REVIEWED_HEAD
+Controller brief
+→ one Developer explores + implements + validates
+→ optional Reviewer when risk justifies it
+→ final check
 ```
 
-Any delivered-code change invalidates stale validation and review certification.
+No Explorer, Agent Pool, staging, or full Git certification by default.
 
-## Complex workflow
+## ORCHESTRATED
 
 ```text
-preflight
--> exploration / investigation
--> dependency + risk map
--> workflow staging branch
--> queued worktree Developers
--> commit-bound validation
--> independent per-task Reviewers
--> repair / re-review / escalation
--> integrate accepted commits into staging
--> full validation
--> Integration Reviewer
--> target-drift reconciliation
--> promote certified staging snapshot
--> cleanup
+optional Explorer / Bug Investigator
+→ dependency/ownership plan
+→ task Developers/worktrees
+→ scoped validation + independent reviews
+→ staging
+→ final validation
+→ Integration Reviewer
+→ promotion
+→ cleanup
 ```
+
+This tier retains the repository's strict commit-bound and Git lifecycle protections.
+
+## Model routing
+
+Model routing applies only when delegated roles exist. FAST stays in the main coding context. STANDARD routes its single Developer by risk. ORCHESTRATED uses the full role+risk escalation policy.
 
 ## Installation
-
-### Windows PowerShell
 
 ```powershell
 git clone https://github.com/EricLad/multi-agent-development.git "$env:USERPROFILE\.codex\skills\multi-agent-development"
 ```
 
-### Linux / macOS
+or:
 
 ```bash
 git clone https://github.com/EricLad/multi-agent-development.git ~/.codex/skills/multi-agent-development
-```
-
-Restart Codex if the new Skill is not discovered immediately.
-
-## Repository structure
-
-```text
-multi-agent-development/
-├── README.md
-├── LICENSE
-├── SKILL.md
-├── agents/
-│   └── openai.yaml
-└── references/
-    ├── agent-pool.md
-    ├── bugfix.md
-    ├── code-state.md
-    ├── explorer.md
-    ├── integration-reviewer.md
-    ├── model-routing.md
-    ├── quality-and-git.md
-    ├── reviewer.md
-    ├── task-contract.md
-    └── worker.md
 ```
 
 ## License
