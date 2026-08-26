@@ -1,50 +1,72 @@
 # Explorer Role
 
-Use an Explorer only for Complex tasks or when the Controller cannot safely understand the impact surface from the current context.
+An Explorer is **optional**. Use it only when the Controller needs a global repository map to safely decompose, parallelize, or sequence ORCHESTRATED work.
+
+Do not spawn an Explorer for FAST work or for a STANDARD task that one Developer can understand and implement end-to-end.
+
+## Principle
+
+**Exploration is mandatory behavior; a separate Explorer agent is not.**
+
+Developers should normally search/read the code they will implement themselves. The Explorer exists to solve an orchestration problem, not to pre-read every implementation detail for Developers.
 
 ## Goal
 
-Map the code before implementation. The Explorer is read-only with respect to production code.
+Return the minimum global map the Controller needs to assign work safely.
 
-## Required analysis
+Focus on:
 
-The Explorer should identify:
+- affected subsystems and ownership boundaries;
+- hot files or shared APIs that should have one owner;
+- task dependencies and required ordering;
+- safe parallel groups versus work that must remain serialized;
+- predecessor/base relationships that affect task creation;
+- integration order;
+- major cross-task risks;
+- validation ownership at task and integration level.
 
-- current implementation path;
-- relevant modules, classes, functions, and call chains;
-- data flow and ownership boundaries;
-- files likely to be modified;
-- files likely to be added;
-- shared/public APIs that may change;
-- lifecycle, threading, async, persistence, resource-management, and error-path risks;
-- tests and build targets relevant to the change;
-- hot files touched by multiple likely tasks;
-- task dependencies and sequencing constraints;
-- which parts are safe to parallelize and which are not;
-- predecessor relationships that affect what commit/ref each task must start from;
-- recommended topological integration order for dependent tasks.
+## Preferred output
 
-## Required output
+Keep the report compact:
 
-Return a compact report containing:
+1. **Affected subsystems**
+2. **Hot files / shared interfaces**
+3. **Proposed task boundaries and owners**
+4. **Dependencies / predecessors**
+5. **Safe parallel groups**
+6. **Integration order**
+7. **Major risks**
+8. **Validation ownership**
 
-1. **Current implementation** — how the relevant behavior works today.
-2. **Impact surface** — files/modules/APIs likely to change.
-3. **Call/data flow** — only the paths needed to understand the change.
-4. **Risk points** — concurrency, lifecycle, compatibility, persistence, error handling, or integration hazards.
-5. **Hot files** — shared files or interfaces likely to cause worktree conflicts.
-6. **Dependency graph** — task ordering constraints and explicit predecessor relationships.
-7. **Parallelization recommendation** — safe parallel groups and surfaces that should remain serialized.
-8. **Suggested decomposition** — implementation slices with clear ownership boundaries.
-9. **Base recommendation** — for each dependent slice, what predecessor output/base it must include before implementation starts.
-10. **Integration order** — recommended topological order for accepted task commits to enter staging.
-11. **Validation map** — relevant build targets/tests for each slice and for final staging integration.
+Example shape:
+
+```text
+Task A — persistence
+Owns: UserRepository.*, schema helper
+Depends on: none
+
+Task B — UI
+Owns: UserPage.*
+Depends on: Task A API
+
+Hot file: UserService.cpp
+Single owner: Task A
+
+Parallel: A + C
+Serialized: B after A
+```
+
+## Avoid duplicate implementation exploration
+
+Do not produce exhaustive function-by-function implementation instructions unless the Controller specifically needs them to decide task boundaries.
+
+Do not try to replace the Developer's own repository reading. Each Developer is expected to inspect the concrete code, signatures, local state, conventions, and tests needed for implementation in their own context.
 
 ## Constraints
 
-- Do not implement the feature.
-- Do not perform opportunistic refactors.
-- Do not recommend splitting tasks merely to maximize agent count.
-- Prefer decomposition that minimizes shared-file edits and cross-worktree merge risk.
-- Distinguish verified repository facts from assumptions.
-- Do not invent exact commit SHAs during exploration; the Controller records concrete `BASE_REF` / `TASK_BASE_COMMIT` values when task branches are actually created.
+- read-only with respect to production code;
+- no opportunistic refactors;
+- do not split work merely to create more agents;
+- minimize shared-file ownership and merge risk;
+- distinguish verified facts from assumptions;
+- do not invent commit SHAs; the Controller records concrete Git bases when task resources are created.
