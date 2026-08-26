@@ -73,14 +73,35 @@ Set `ACCEPTED_HEAD = TASK_HEAD` only when all applicable conditions hold:
 
 and the Controller has accepted the task contract outcome and dispositioned material findings.
 
-Only `ACCEPTED_HEAD` may be integrated into the Complex workflow staging branch.
+Only `ACCEPTED_HEAD` may be integrated.
+
+## Simple-task promotion and target drift
+
+For a Simple task, prefer a workflow-owned temporary task branch even when no additional worktree is needed. Keep `USER_TARGET_BRANCH` unchanged while the task is implemented, validated, and reviewed.
+
+Before promotion, compare the current user-target HEAD with `TARGET_BASE_COMMIT`.
+
+If the user target has not moved, promote the exact `ACCEPTED_HEAD` without introducing additional tree changes.
+
+If the user target moved:
+
+1. do not resolve final conflicts directly on the user target;
+2. incorporate the latest user-target state into the temporary task branch using the repository-appropriate merge/rebase strategy;
+3. resolve any conflicts on the temporary branch;
+4. the resulting commit becomes a new `TASK_HEAD`;
+5. prior `VALIDATED_HEAD`, `REVIEWED_HEAD`, and `ACCEPTED_HEAD` are stale unless they equal that new HEAD;
+6. rerun scoped validation and independent review;
+7. set a new `ACCEPTED_HEAD` only when the task invariant is restored;
+8. then promote the certified temporary-branch result to the user target.
+
+This keeps conflict resolution inside a branch that can still be validated/reviewed before the user's target moves.
 
 ## Complex staging state
 
 For Complex work, create a workflow-owned staging/integration branch from `TARGET_BASE_COMMIT`. Track:
 
 - `STAGING_BRANCH`;
-- `STAGING_BASE_COMMIT`;
+- `STAGING_BASE_COMMIT = TARGET_BASE_COMMIT`;
 - `STAGING_HEAD`;
 - `STAGING_VALIDATED_HEAD`;
 - `STAGING_REVIEWED_HEAD`.
@@ -92,14 +113,14 @@ After all intended task work is integrated:
 1. record `STAGING_HEAD`;
 2. run the clean/full/integration/regression validation suite on that exact HEAD;
 3. if it passes, set `STAGING_VALIDATED_HEAD = STAGING_HEAD`;
-4. run Integration Review over `STAGING_BASE_COMMIT..STAGING_HEAD`, with the validation results available as context;
+4. run Integration Review over `STAGING_BASE_COMMIT..STAGING_HEAD`, with validation results available as context;
 5. if it passes, set `STAGING_REVIEWED_HEAD = STAGING_HEAD`.
 
 If any repair changes staging, both prior staging validation and Integration Review are stale. Repeat the affected repair cycle until:
 
 `STAGING_HEAD == STAGING_VALIDATED_HEAD == STAGING_REVIEWED_HEAD`
 
-## User-target drift gate
+## Complex user-target drift gate
 
 Before integrating staging into `USER_TARGET_BRANCH`, verify whether the user target still points to `TARGET_BASE_COMMIT`.
 
@@ -115,9 +136,9 @@ Only a staging snapshot that is both validated and reviewed may be promoted to t
 
 ## Promotion gate
 
-Prefer a promotion that does not change the already certified tree (for example a fast-forward when feasible, or a normal merge without semantic conflict resolution).
+Prefer a promotion that does not change the already certified tree, for example a fast-forward when feasible or a normal merge without semantic conflict resolution.
 
-If promotion itself requires code conflict resolution or otherwise changes the resulting tree, the promoted result has not been certified. Move that resolution back into staging and repeat the final gates before updating the user target.
+If promotion itself requires code conflict resolution or otherwise changes the resulting tree, the promoted result has not been certified. Move that resolution back into the temporary task branch (Simple) or staging branch (Complex) and repeat the applicable final gates before updating the user target.
 
 ## Final invariant
 
