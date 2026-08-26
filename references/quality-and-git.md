@@ -1,242 +1,194 @@
 # Quality Gates and Git / Worktree Safety
 
-Read `code-state.md` before implementation starts. All validation, review, integration, and cleanup decisions are bound to exact commits.
+Use validation and Git controls in proportion to the workflow tier.
 
-## Git preflight gate
+# FAST
 
-Before any Developer edits code, the Controller records the repository state required by `code-state.md`:
+FAST should stay lightweight.
 
-- user target branch and its starting HEAD;
-- whether the current working tree is dirty;
+Before editing:
+
+- inspect repository/project instructions;
+- inspect current Git status enough to avoid overwriting or confusing unrelated user changes.
+
+During completion:
+
+- run the most relevant targeted build/test/checks;
+- inspect the final diff/state;
+- do not create a workflow branch/worktree/staging branch merely for ceremony;
+- do not require commit/SHA certification unless the user/project explicitly asks for it.
+
+# STANDARD
+
+STANDARD normally uses one Developer and targeted validation.
+
+Recommended:
+
+- preserve user changes;
+- use the repository's normal branch/commit practice;
+- run relevant build/tests/checks after the final implementation state;
+- when an independent Reviewer is justified, give the Reviewer a stable final diff/state; a commit boundary is useful but not mandatory unless needed for safety/auditability.
+
+Do not create Agent Pool, worktrees, staging, resource ledgers, or full commit-state bookkeeping unless the task upgrades to ORCHESTRATED.
+
+# ORCHESTRATED
+
+The rest of this reference applies to ORCHESTRATED work.
+
+Read `code-state.md`.
+
+## Git preflight
+
+Record:
+
+- user target branch and starting HEAD;
+- working-tree dirty state;
 - existing worktrees;
-- existing local branches relevant to workflow naming.
+- relevant existing local branches.
 
-Do not mix workflow edits with pre-existing uncommitted user changes. Preserve user state and isolate workflow work when necessary.
+Preserve pre-existing user work.
 
 ## Per-task validation gate
 
-A Developer is not ready for authoritative review until:
+A task is ready for authoritative review only when:
 
 1. all intended task changes are committed;
-2. the task working tree is clean;
+2. the task worktree is clean;
 3. `TASK_HEAD` is recorded;
-4. the relevant build target(s) pass on that exact `TASK_HEAD`;
-5. relevant tests pass on that exact `TASK_HEAD`;
-6. required static/lint/format checks pass when the project uses them;
-7. `VALIDATED_HEAD = TASK_HEAD` is recorded.
+4. relevant build/tests/checks pass on that exact HEAD;
+5. `VALIDATED_HEAD = TASK_HEAD` is recorded.
 
-If code, tests, build files, configuration, schema, protocol, or other task-relevant content changes afterward, the prior validation is stale.
+A later delivered-content change makes stale validation invalid.
 
-Do not fabricate commands. Derive them from repository documentation, CI, build files, or established project conventions.
+## Staging branch
 
-## Workflow baseline and staging branch
+For ORCHESTRATED work:
 
-For Complex work:
-
-- record `TARGET_BASE_COMMIT` before implementation;
-- create a workflow-owned staging/integration branch from that commit;
-- record the staging branch in the Git resource ledger;
-- integrate only Controller-accepted task commits into staging;
-- keep the user's target branch at its last known good state until the staging result has passed final gates.
-
-The final Integration Review range is based on the staging baseline and the exact current staging HEAD.
+- record `TARGET_BASE_COMMIT`;
+- create a workflow-owned staging branch from it;
+- integrate only Controller-accepted task snapshots;
+- keep the user target unchanged until the staging result passes final gates.
 
 ## Git resource ledger
 
-Track **every Git resource created by this workflow**, not only resources that have worktrees.
+Track every workflow-created Git resource:
 
-At minimum record:
-
-- resource/task ID;
-- local branch name;
-- worktree path when one exists;
-- resource role: task branch, simple-task branch, staging branch, or other workflow-owned temporary branch;
-- base ref and base commit;
-- predecessor/dependency information when applicable;
+- task/resource ID;
+- local branch;
+- worktree path if any;
+- role: task branch, staging branch, or other workflow-owned temporary resource;
+- base ref/commit;
+- predecessor/dependency information;
 - integration target;
-- whether the branch/worktree was created by this workflow;
-- lifecycle state such as active, review, accepted, integrated, cleanup-pending, deleted, or retained-with-reason.
+- lifecycle state.
 
 Do not infer ownership later from branch names alone.
 
 ## Worktree rules
 
-- Use one isolated worktree/branch per independently parallelized implementation task.
-- Name branches/worktrees clearly enough to map them to task IDs.
-- Do not create worktrees for tasks that cannot safely run in parallel merely for uniformity.
-- Do not let multiple Developers unknowingly own the same hot file or shared API.
-- Keep each worktree focused on its task contract.
-- Do not delete a worktree containing uncommitted work.
-- Never delete or reset a branch/worktree that predates this workflow unless the user explicitly requests it.
+- use worktrees only for genuinely parallel/isolated implementation;
+- one branch/worktree per independent task;
+- do not let multiple Developers unknowingly own the same hot file/shared API;
+- do not delete dirty worktrees;
+- never reset/delete pre-existing user resources.
 
-When creating a task worktree, use the explicit `BASE_REF` / `TASK_BASE_COMMIT` determined by the dependency plan. Conceptually:
+Create each task from the dependency-correct base and record that base.
 
-```text
-git worktree add -b <temporary-task-branch> <worktree-path> <base-ref>
-```
+## Dependency-aware task creation
 
-Record the resulting task base immediately.
+A task becomes ready only when required predecessors are accepted and the selected base contains those outputs.
 
-## Dependency-aware branch creation
+Do not silently change a task base after implementation begins without invalidating/re-running affected gates.
 
-A task with predecessors does not become ready merely because an agent slot is available.
+Integrate accepted tasks in dependency/topological order.
 
-Before creating/starting it:
+## Per-task staging gate
 
-- all required predecessor outputs must be accepted;
-- the selected `BASE_REF` must contain the predecessor commits required by the contract;
-- record `TASK_BASE_COMMIT` from that exact base;
-- do not silently rebase the task later onto a different base without invalidating and re-running the relevant task gates.
+Before staging integration verify:
 
-Integrate accepted tasks into staging in topological/dependency order.
-
-## Per-task merge gate
-
-Before a task is eligible for staging integration, verify:
-
-- acceptance criteria are met;
+- acceptance criteria met;
 - `TASK_HEAD == VALIDATED_HEAD == REVIEWED_HEAD == ACCEPTED_HEAD`;
-- the task working tree is clean;
-- BLOCKER/HIGH findings are resolved;
-- material disputes are arbitrated;
-- scope drift is understood and accepted.
+- worktree clean;
+- BLOCKER/HIGH findings resolved;
+- material disputes/scope drift dispositioned.
 
-Merge only `ACCEPTED_HEAD`, never an unreviewed or unvalidated later task tip.
-
-When resolving task-to-staging merge conflicts, preserve task semantics rather than choosing a side mechanically. Any semantic conflict resolution changes `STAGING_HEAD` and must be covered by the final staging gates.
+Merge only `ACCEPTED_HEAD`.
 
 ## Integration strategy
 
-For workflow-created temporary task branches, prefer normal merge-based integration that preserves ancestry when repository policy allows it. This makes provenance and safe cleanup verifiable.
+Prefer normal merge-based integration for workflow task branches when repository policy allows because provenance/cleanup are easier to prove.
 
-If repository policy or the user explicitly requires squash, rebase, cherry-pick, or another non-ancestry-preserving strategy:
+If squash/rebase/cherry-pick is required, record the integration method and evidence mapping the accepted change into staging.
 
-- record that integration method in the resource ledger;
-- record explicit evidence mapping the accepted task change into staging;
-- do not pretend ancestry-based checks apply;
-- use the special cleanup rule below for the temporary branch.
+## Final ORCHESTRATED gate
 
-## Final Complex gate — one canonical order
-
-After all intended accepted tasks are integrated into the workflow staging branch:
+After accepted tasks are in staging:
 
 1. record `STAGING_HEAD`;
-2. perform the clean/appropriately fresh build required by the project;
-3. run the project-appropriate full test suite;
+2. perform clean/fresh build as appropriate;
+3. run project-appropriate full tests;
 4. run relevant integration/regression/stress checks;
-5. if all required validation passes, set `STAGING_VALIDATED_HEAD = STAGING_HEAD`;
-6. run the independent Integration Reviewer over `STAGING_BASE_COMMIT..STAGING_HEAD`, with validation results available as context;
-7. if review passes, set `STAGING_REVIEWED_HEAD = STAGING_HEAD`;
-8. if a repair changes staging, invalidate stale validation/review and repeat until the same exact staging HEAD is both validated and reviewed;
-9. check for user-target drift and incorporate the latest target into staging if necessary;
-10. if staging changes due to target drift/conflict resolution, repeat final validation and Integration Review;
-11. only then promote the certified staging result into the user target branch.
+5. set `STAGING_VALIDATED_HEAD = STAGING_HEAD` when validation passes;
+6. run Integration Review over `STAGING_BASE_COMMIT..STAGING_HEAD`;
+7. set `STAGING_REVIEWED_HEAD = STAGING_HEAD` when review passes;
+8. if staging changes, repeat stale gates;
+9. reconcile user-target drift in staging if needed and re-run gates;
+10. promote only the certified staging result.
 
-The canonical readiness invariant is:
+Readiness invariant:
 
 `STAGING_HEAD == STAGING_VALIDATED_HEAD == STAGING_REVIEWED_HEAD`
 
-Do not use the conflicting order `Integration Review -> tests` in one place and `tests -> Integration Review` in another. This file defines the canonical order.
+## Promotion
 
-## Promotion to the user target
+Promotion must not introduce unreviewed semantic changes. Resolve conflicts in staging, revalidate/re-review, then promote.
 
-Keep the user target at its last known good state until staging has passed the canonical final gate.
+# Mandatory ORCHESTRATED cleanup
 
-Before promotion, verify whether the user target moved since `TARGET_BASE_COMMIT`. Follow the drift procedure in `code-state.md` when it did.
+Process every workflow-owned temporary resource after final acceptance.
 
-Promotion should not introduce unreviewed tree changes. If the final merge into the user target requires semantic conflict resolution, perform that resolution in staging and rerun the final gates rather than resolving directly on the user target and declaring success.
+## Ownership
 
-## Mandatory cleanup gate
+Auto-delete only resources proven to be created by this workflow. Never delete user-owned/uncertain resources or remote branches merely because names match.
 
-Cleanup is part of task completion, not an optional cosmetic step. Process **every workflow-owned temporary Git resource**, including:
+## Worktree cleanliness
 
-- parallel task worktrees and branches;
-- Simple-task temporary branches even when no worktree was created;
-- the workflow staging branch;
-- any other branch explicitly recorded as workflow-owned.
-
-### 1. Confirm ownership
-
-Delete automatically only when the resource ledger proves the branch/worktree was created by this workflow for the current run.
-
-Never automatically delete:
-
-- user pre-existing branches/worktrees;
-- the user target branch;
-- branches whose ownership is uncertain;
-- remote branches merely because a similarly named local temporary branch exists.
-
-### 2. Confirm worktree cleanliness when applicable
-
-For a resource with a worktree:
+For worktrees, verify clean state before removal:
 
 ```text
 git -C <worktree-path> status --porcelain
 ```
 
-Expected output is empty. If dirty, retain the resource and report why. Do not force-remove it merely to complete cleanup.
+Do not force-remove dirty worktrees.
 
-### 3. Confirm integration
+## Integration proof
 
-For normal merge-based integration, verify the temporary branch tip is an ancestor of its final integration target, for example:
+For merge-based integration, ancestry proof may use:
 
 ```text
 git merge-base --is-ancestor <temporary-branch> <integration-target>
 ```
 
-For squash/rebase/cherry-pick/non-ancestry integration, require recorded evidence that:
+For non-ancestry integration require recorded evidence that the accepted task change is represented in the certified final result and no unique unintegrated work remains.
 
-- the branch is workflow-owned;
-- its `ACCEPTED_HEAD` change is present in the certified staging/final result;
-- the final result passed validation and review;
-- no unique unintegrated commits/worktree changes remain on the temporary resource.
+## Remove resources
 
-If any of those facts are uncertain, retain the branch and report why.
-
-### 4. Remove the worktree when one exists
-
-After safety checks pass:
+Remove the worktree first when one exists:
 
 ```text
 git worktree remove <worktree-path>
 ```
 
-Do not use `--force` by default.
+Then delete the local branch.
 
-### 5. Delete the workflow-created local branch
-
-For merge-based integration, prefer Git safe deletion:
+Prefer:
 
 ```text
 git branch -d <temporary-branch>
 ```
 
-For an explicitly recorded non-ancestry integration where `-d` rejects the branch even though all special safety proofs above are satisfied, the Controller may use controlled force deletion:
+Controlled `-D` is allowed only for a proven workflow-owned branch after non-ancestry integration is explicitly verified safe.
 
-```text
-git branch -D <temporary-branch>
-```
+Verify cleanup with `git worktree list` and `git branch --list`.
 
-`-D` is allowed only for a branch proven to be workflow-owned and fully represented in the already certified final result. Never use it merely to make the repository look clean.
-
-### 6. Verify cleanup
-
-Verify commands actually removed the resources:
-
-```text
-git worktree list
-git branch --list <temporary-branch>
-```
-
-A worktree path should no longer be listed and a deleted local branch query should return no match.
-
-`git worktree prune` may clean stale metadata, but it is not a substitute for branch deletion.
-
-## Cleanup completion condition
-
-Every workflow-owned temporary resource must end in exactly one of these states:
-
-- **Deleted** — the temporary worktree, if any, and the local branch are removed and verified absent; or
-- **Retained with reason** — cleanup is intentionally blocked by dirty state, uncertain integration, PR/audit requirements, or another concrete safety reason reported to the user.
-
-Do not declare cleanup complete while workflow-created local branches remain silently in the repository.
+Every workflow-owned resource ends as **Deleted** or **Retained with reason**.
