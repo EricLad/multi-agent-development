@@ -1,206 +1,140 @@
 # Role + Risk Adaptive Model Routing
 
-Use adaptive model routing instead of assigning one fixed model to every subagent. The Controller chooses the least expensive model that is appropriate for the role and risk, then escalates when evidence shows that the current tier is insufficient.
+Apply model routing only when subagents are actually used. Do not create subagents or bookkeeping solely to exercise this policy.
 
-Model choice is a quality-control decision. Do not downgrade a high-risk task merely to increase parallel throughput or reduce cost.
+# Workflow-tier interaction
 
-## Model families
+## FAST
 
-When these configurations are available, use the following capability tiers:
+No delegated-role routing by default. Use the current main-session model and keep the task in one coding context.
 
-- **Luna max** — cost-efficient, high-volume work with strong reasoning effort; preferred for exploration, routine review, and bounded low-risk implementation.
-- **Terra xhigh** — default production implementation tier; balances capability and cost for normal software engineering.
-- **Terra max** — high-risk implementation, difficult root-cause analysis, concurrency/lifetime/state-machine work, or other tasks where additional reasoning is justified.
-- **Sol xhigh / max** — escalation tier for critical, unusually difficult, or repeatedly unresolved work where frontier capability is materially valuable.
+Do not record `ROLE/RISK_LEVEL/ASSIGNED_MODEL/...` fields for routine FAST work.
 
-If an exact model or reasoning effort is unavailable, use the closest available capable configuration while preserving the intended capability ordering. State a material downgrade once; do not silently weaken a quality-critical role.
+## STANDARD
 
-## Risk is separate from Simple / Complex
+Use one Developer when delegation is useful.
 
-Execution complexity and model risk are related but not identical.
+Suggested routing:
 
-A task may be structurally Simple but still high risk, for example:
+- bounded Low-risk implementation -> **Luna max** when available;
+- normal production implementation -> **Terra xhigh**;
+- High-risk bounded implementation -> **Terra max** when justified.
 
-- a one-line authentication or authorization change;
-- a small memory-lifetime fix in a critical callback;
-- a schema/protocol compatibility change;
-- a tiny change that can corrupt persistent data.
+A STANDARD Reviewer is conditional. When used:
 
-Conversely, a Complex task may contain many low-risk exploration or mechanical implementation slices.
+- routine review -> **Luna max**;
+- High-risk/uncertain review -> **Terra xhigh**.
 
-For every implementation/investigation task, classify `RISK_LEVEL` independently as **Low**, **Medium**, **High**, or **Critical**.
+Keep routing notes concise. Full model-audit fields are unnecessary unless an escalation materially matters.
 
-## Risk signals
+## ORCHESTRATED
 
-### Low
+Use the full adaptive routing below.
 
-Typical characteristics:
+# Capability tiers
 
-- localized and reversible;
-- no public API/schema/protocol/security/lifetime/concurrency impact;
-- deterministic validation is straightforward;
-- failure blast radius is small;
-- implementation is mechanical or strongly patterned by nearby code.
+- **Luna max** — cost-efficient high-volume exploration/routine review/bounded low-risk implementation.
+- **Terra xhigh** — default normal production implementation and stronger analysis tier.
+- **Terra max** — high-risk implementation, difficult root-cause analysis, concurrency/lifetime/state-machine work.
+- **Sol xhigh/max** — Critical or repeatedly unresolved work where stronger capability is materially valuable.
 
-### Medium
+If an exact model/reasoning effort is unavailable, use the closest capable tier and state material downgrades once.
 
-Typical characteristics:
+# Risk signals
 
-- normal production feature/refactor work;
-- some cross-file/module reasoning;
-- moderate regression surface;
-- existing architecture must be understood and preserved;
-- mistakes are recoverable and well-covered by tests/review.
+Risk is independent from workflow structure and diff size.
 
-### High
+## Low
 
-Any of the following is a strong signal:
+Localized, reversible, small blast radius, deterministic validation, no material security/concurrency/lifetime/persistence/schema/protocol/public-compatibility concern.
 
-- concurrency, async ordering, ownership, object lifetime, memory/resource safety;
-- authentication, authorization, secrets, trust boundaries, or other security-sensitive behavior;
-- database/schema/migration or persistent-data correctness;
-- public API, protocol, serialization, compatibility, or build-system changes with broad consumers;
-- cross-module architecture or state-machine behavior;
-- difficult intermittent bug diagnosis;
-- large blast radius or expensive rollback;
-- multiple plausible root causes with weak discriminating evidence.
+## Medium
 
-### Critical
+Normal production feature/refactor work with moderate reasoning/regression surface.
 
-Use sparingly when failure could cause severe data loss/security impact, the architecture is unusually difficult, or lower tiers have failed to converge on a defensible solution.
+## High
 
-## Role routing
+Strong signals include:
 
-### Explorer
+- concurrency, async ordering, ownership/lifetime/resource safety;
+- security/trust boundaries;
+- persistent data/schema/migration correctness;
+- protocol/serialization/public API compatibility;
+- broad cross-module/state-machine behavior;
+- difficult intermittent bugs;
+- large blast radius or expensive rollback.
 
-Default:
+## Critical
 
-`Explorer -> Luna max`
+Severe data/security impact, unusually difficult architecture, or failure of lower tiers to converge on a defensible solution.
 
-Exploration is normally read-only and high-volume: repository discovery, call chains, dependency mapping, hot-file analysis, build/test discovery, and task decomposition support.
+# Role routing for ORCHESTRATED work
 
-Escalate to **Terra xhigh** when exploration itself requires difficult architectural inference, very long-context synthesis, conflicting subsystem behavior, or ambiguous ownership/lifecycle reasoning.
+## Explorer
 
-### Bug Investigator
+Default: **Luna max**.
 
-Start with:
+Escalate to Terra xhigh only when the orchestration map itself needs difficult architectural/ownership inference.
 
-`Low/Medium diagnostic work -> Luna max`
+Remember: Explorer is optional and should exist only when decomposition/orchestration needs a global map.
 
-Use:
+## Bug Investigator
 
-`High-risk or non-trivial root-cause work -> Terra xhigh`
+- straightforward diagnosis -> Luna max;
+- non-trivial cross-module/root-cause work -> Terra xhigh;
+- concurrency/lifetime/state corruption or stubborn multi-hypothesis diagnosis -> Terra max;
+- Critical/repeatedly unresolved -> Sol xhigh/max.
 
-Escalate to:
+## Developer
 
-`Concurrency/lifetime/state corruption or stubborn multi-hypothesis diagnosis -> Terra max`
+- Low-risk/mechanical -> Luna max;
+- normal production -> Terra xhigh;
+- High-risk -> Terra max;
+- Critical -> Sol xhigh/max when justified.
 
-Use **Sol xhigh/max** only when the investigation remains materially unresolved after strong evidence gathering, or the bug is Critical.
+## Reviewer
 
-Do not keep a weak diagnosis merely to avoid escalation.
+Default: Luna max.
 
-### Developer
+Escalate to Terra xhigh for High/Critical risk, material uncertainty, security/concurrency/lifetime/schema/protocol/broad public behavior, or difficult disputes.
 
-Default routing:
+## Integration Reviewer
 
-- **Low-risk Simple implementation -> Luna max**
-- **Medium / normal production implementation -> Terra xhigh**
-- **High-risk implementation -> Terra max**
-- **Critical implementation -> Sol xhigh/max** when available and justified
+Default: Terra xhigh.
 
-Luna max is not the default for ordinary production coding. Use it when the task contract is narrow, the implementation is strongly patterned, and validation/review can reliably detect mistakes.
+Escalate to Terra max for High-risk integrated changes, meaningful conflict resolution, broad coupling, concurrency/security/data-migration concerns. Sol is reserved for Critical/unresolved integration uncertainty.
 
-A small diff does not automatically qualify for Luna. Security, lifetime, concurrency, persistence, protocol, or compatibility risk overrides diff size.
+# Escalation triggers
 
-### Reviewer
+Escalate when stronger capability is likely to improve correctness because:
 
-Default:
+- diagnosis/reasoning fails to converge;
+- multiple plausible causes remain unresolved;
+- repeated implementation/test cycles fail without progress;
+- unexpected cross-module/hot-file coupling appears;
+- a Reviewer reports architecture-level uncertainty;
+- an evidence-based Developer/Reviewer dispute cannot be resolved confidently;
+- validation exposes intermittent/non-local failures;
+- merge/target-drift resolution materially increases complexity;
+- actual risk is higher than initially believed.
 
-`Per-task Reviewer -> Luna max`
+Do not escalate merely because the task is long.
 
-The Reviewer remains independent from the Developer and certifies an exact commit as defined by `code-state.md`.
+# Cost control
 
-Escalate the review to **Terra xhigh** when:
+Use a stronger model only for the phase that needs it. Once uncertainty is resolved, unrelated low-risk work may return to its normal tier.
 
-- the task is High/Critical risk;
-- the Developer used Terra max/Sol for difficult reasoning;
-- a material Developer/Reviewer dispute cannot be resolved confidently;
-- the patch changes security, concurrency/lifetime, schema/protocol, or broad public behavior;
-- the first review reports uncertainty about correctness rather than a clear pass/finding set.
+Do not sacrifice Developer/Reviewer independence when the workflow requires independent review.
 
-For Critical changes, the Controller may require a second independent high-tier review instead of merely replacing the first review.
+# ORCHESTRATED audit fields
 
-### Integration Reviewer
-
-Default:
-
-`Integration Reviewer -> Terra xhigh`
-
-Integration Review has a larger cognitive surface than ordinary per-task review because it must reason across multiple accepted tasks, merge interactions, lifecycle/state assumptions, and final staging behavior.
-
-Escalate to **Terra max** when the integrated change is High risk, spans many coupled subsystems, contains meaningful merge/conflict resolution, or includes concurrency/security/data-migration concerns.
-
-Escalate to **Sol xhigh/max** for Critical integration or when Terra-level integration review remains materially uncertain.
-
-## Escalation triggers
-
-Escalate one capability tier when any of these occur and the stronger tier is likely to improve the result:
-
-- the agent cannot establish a defensible answer after reasonable repository investigation;
-- root-cause confidence remains low with multiple plausible candidates;
-- repeated implementation/test cycles fail without convergence;
-- a Reviewer identifies architecture-level uncertainty rather than a localized defect;
-- Developer and Reviewer produce a material evidence-based dispute the Controller cannot resolve confidently;
-- unexpected hot-file/dependency/cross-module coupling appears;
-- validation exposes intermittent or non-local failures;
-- target-drift or merge conflict resolution creates a materially more complex integrated state;
-- the task's actual risk is higher than initially classified.
-
-Do not escalate merely because a task is long. Escalate for reasoning difficulty, risk, uncertainty, or failure to converge.
-
-## De-escalation and cost control
-
-Use stronger models only for the phase that needs them.
-
-Examples:
-
-- a Terra max Bug Investigator can establish the root cause, while a narrow Low-risk follow-up implementation may still use Terra xhigh or Luna max if the task contract makes the implementation mechanical;
-- a Terra max Developer does not imply every documentation/test bookkeeping subtask also needs Terra max;
-- after a high-tier escalation resolves an uncertainty, return unrelated ready-queue work to its normal role/risk routing.
-
-Do not sacrifice Developer/Reviewer independence when reusing model tiers. Two agents using the same model are still separate roles/contexts.
-
-## Task-contract fields
-
-For every delegated implementation or investigation activity, record when applicable:
+For ORCHESTRATED delegated activities, record when useful:
 
 - `ROLE`;
-- `RISK_LEVEL` — Low / Medium / High / Critical;
+- `RISK_LEVEL`;
 - `ASSIGNED_MODEL`;
 - `REASONING_EFFORT`;
-- `MODEL_RATIONALE` — short explanation when not using the role default;
-- `ESCALATION_REASON` — populated if the task was upgraded during execution.
+- `MODEL_RATIONALE` when deviating from default;
+- `ESCALATION_REASON` when upgraded.
 
-The Controller may change the assigned tier when new evidence changes risk or uncertainty, but should record why.
-
-## Agent-pool interaction
-
-Model routing does not change the Agent Pool correctness rules.
-
-- every active subagent still consumes runtime capacity according to the environment;
-- do not saturate the pool with cheap Luna workers and starve review/repair slots;
-- a model escalation is a scheduler transition, not permission to duplicate the same task concurrently;
-- preserve the same task contract, Git snapshot state, and evidence when handing an unresolved task to a stronger model.
-
-## Completion invariant
-
-Adaptive routing must never weaken:
-
-- commit-bound validation;
-- Developer != Reviewer independence;
-- re-review after delivered-code changes;
-- Bugfix root-cause evidence;
-- staging Integration Review;
-- final promotion and Git cleanup gates.
-
-Cost and throughput are optimization goals. Correctness and evidence remain the acceptance criteria.
+These fields are not a completion ceremony for FAST/STANDARD.
