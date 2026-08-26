@@ -1,27 +1,29 @@
 ---
 name: multi-agent-development
-description: Orchestrate software development in Codex with a controller-only main session and specialized subagents for exploration, implementation, independent review, integration review, testing, bug diagnosis, regression verification, dynamic agent-pool scheduling, and Git worktree-based parallel development. Use when implementing features, fixing bugs, refactoring, optimizing performance, making non-trivial code changes, coordinating multiple coding agents, deciding whether work should be split, using worktrees for parallel implementation, managing subagent concurrency, or enforcing independent code-review and integration quality gates.
+description: Orchestrate software development in Codex with a controller-only main session and specialized subagents for exploration, implementation, independent review, integration review, testing, bug diagnosis, regression verification, dynamic agent-pool scheduling, commit-bound quality gates, and Git worktree-based parallel development. Use when implementing features, fixing bugs, refactoring, optimizing performance, making non-trivial code changes, coordinating multiple coding agents, deciding whether work should be split, using worktrees for parallel implementation, managing subagent concurrency, or enforcing independent code-review and integration quality gates.
 ---
 
 # Multi-Agent Development
 
-Use the main conversation as the **Controller / Tech Lead**. The controller owns requirements, decomposition, coordination, arbitration, integration, and final acceptance. It should not implement production code itself unless no subagent mechanism is available and the user explicitly permits a fallback.
+Use the main conversation as the **Controller / Tech Lead**. The Controller owns requirements, classification, decomposition, coordination, arbitration, integration, Git lifecycle, and final acceptance. It should not implement production code itself unless no subagent mechanism is available and the user explicitly permits a fallback.
 
 ## Core rules
 
 1. Clarify material ambiguity before implementation. Do not ask about details that can be safely resolved from the repository or project instructions.
 2. Read and obey the repository's `AGENTS.md`, build instructions, test instructions, architecture constraints, and relevant local documentation before assigning implementation work.
-3. Classify the request type as **Feature**, **Bugfix**, **Refactor**, **Performance**, or **Maintenance**, then classify execution complexity as **Simple** or **Complex**.
-4. Complexity is based on diagnosis difficulty, coupling, affected modules, dependency structure, risk, and whether independent parallel work is possible. Do not classify by line count alone.
-5. For Bugfix work, establish a defensible root cause before treating a code change as the final fix. Prefer reproduction or other concrete evidence, and require regression verification whenever practical.
-6. Keep roles independent: **Developer != Reviewer**. A developer never performs the authoritative review of its own change.
-7. Every implementation task must pass its scoped build/tests before review.
-8. Reviewer findings are evidence, not self-executing decisions. The developer may confirm or dispute them with evidence; the controller arbitrates unresolved material findings.
-9. Parallelize only tasks with safe ownership boundaries. Avoid assigning the same hot file or shared API to multiple workers unless dependencies are explicitly ordered.
-10. Manage parallel subagents through a dynamic **Agent Pool / Concurrency Gate**. Do not hardcode a universal Codex agent limit and do not consume all available capacity with Developers when Reviewers or investigation may need slots.
-11. For complex parallel work, use isolated worktrees/branches. Merge only controller-approved work.
-12. After all complex-task branches are integrated, run an independent **Integration Review** over the complete `BASE_COMMIT..FINAL_HEAD` change and run the project-appropriate full validation suite.
-13. Treat cleanup as a mandatory lifecycle gate. For every workflow-created temporary worktree, track its corresponding temporary branch, safely remove the worktree after final acceptance, then safely delete the local task branch and verify both resources are gone. Never delete user-owned or uncertain branches/worktrees automatically.
+3. Run the Git/repository preflight in `references/code-state.md` before any Developer edits code. Preserve pre-existing user changes; never silently mix them with workflow work.
+4. Classify the request type as **Feature**, **Bugfix**, **Refactor**, **Performance**, or **Maintenance**, then classify execution complexity as **Simple** or **Complex**.
+5. Complexity is based on diagnosis difficulty, coupling, affected modules, dependency structure, risk, and whether independent parallel work is possible. Do not classify by line count alone.
+6. For Bugfix work, establish a defensible root cause before treating a code change as the final fix. Prefer reproduction or other concrete evidence, and require regression verification whenever practical.
+7. Keep roles independent: **Developer != Reviewer**. A Developer never performs the authoritative review of its own change.
+8. Quality gates certify exact commits. Every task tracks `TASK_BASE_COMMIT`, `TASK_HEAD`, `VALIDATED_HEAD`, `REVIEWED_HEAD`, and `ACCEPTED_HEAD` as defined in `references/code-state.md`.
+9. A Developer handoff is not valid until all intended changes are committed, the task worktree is clean, and scoped validation passed on the exact reported `TASK_HEAD`.
+10. Any task-relevant code/test/build/config change after validation or review invalidates the stale certification. The new final HEAD must be revalidated and independently re-reviewed before acceptance.
+11. Reviewer findings are evidence, not self-executing decisions. The Developer may confirm or dispute them with evidence; the Controller arbitrates unresolved material findings.
+12. Parallelize only tasks with safe ownership boundaries and satisfied dependencies. Avoid assigning the same hot file or shared API to multiple workers unless dependencies are explicitly ordered.
+13. Manage parallel subagents through the dynamic **Agent Pool / Concurrency Gate** in `references/agent-pool.md`. Do not hardcode a universal Codex agent limit.
+14. For Complex work, keep the user's target branch at its last known good state. Integrate accepted task commits into a workflow-owned staging branch first; final validation and Integration Review occur on staging before promotion to the user target.
+15. Treat cleanup as a mandatory lifecycle gate. Track and clean every workflow-created temporary branch/worktree, including Simple-task branches and the Complex staging branch.
 
 ## Model routing
 
@@ -34,23 +36,40 @@ When the exact configurations are available, prefer:
 
 If an exact model or mode is unavailable, use the closest available capable model while preserving role separation and review independence. State the downgrade once; do not silently change the workflow.
 
+## Required references
+
+Read these when the corresponding phase applies:
+
+- `references/code-state.md` — repository preflight, commit/SHA state machine, invalidation, staging, target drift, promotion.
+- `references/task-contract.md` — bounded Developer contract, explicit Git base/predecessors, handoff fields.
+- `references/worker.md` — Developer implementation and commit-bound handoff rules.
+- `references/reviewer.md` — independent per-task review bound to an exact HEAD.
+- `references/quality-and-git.md` — validation order, Git/worktree/staging integration and cleanup safety.
+- `references/agent-pool.md` — concurrent subagent scheduling.
+- `references/explorer.md` — complex impact/dependency exploration.
+- `references/bugfix.md` — Bugfix root-cause and regression workflow.
+- `references/integration-reviewer.md` — final review of the certified staging snapshot.
+
 ## Agent pool and concurrency
 
 Read `references/agent-pool.md` whenever more than one subagent may be active or the task is decomposed into parallel work.
 
-Do not assume a fixed Codex concurrency limit. If the runtime exposes a concrete limit, schedule against it. If the limit is unknown, start conservatively with at most **3 concurrent implementation Developers**, preserve capacity for Reviewer / Investigator / repair work, and only increase the implementation wave size after higher capacity is actually demonstrated.
+Do not assume a fixed Codex concurrency limit. If the runtime exposes a concrete limit, schedule against it. If unknown, start conservatively with at most **3 concurrent implementation Developers**, preserve capacity for Reviewer / Investigator / repair work, and increase only after higher capacity is demonstrated.
 
 Track at least:
 
-- **Active agents** — currently consuming subagent capacity;
-- **Ready queue** — dependency-satisfied activities waiting for a slot;
-- **Blocked queue** — activities waiting on dependencies, shared ownership, review, or decisions.
+- **Active agents**;
+- **Ready queue**;
+- **Blocked queue**.
 
-Treat agent slots and worktrees independently. When a Developer finishes, collect its handoff and release/close its agent thread when supported, but keep its branch/worktree until review, repair, controller acceptance, merge, and cleanup are complete.
+A task enters the Ready queue only when both conditions hold:
 
-Prefer pipelined review over batch review: when one Developer finishes, free its agent slot and start its independent Reviewer when possible while other Developers continue.
+- dependency/predecessor requirements are satisfied;
+- an appropriate `BASE_REF` / `TASK_BASE_COMMIT` can be assigned safely.
 
-If a spawn fails because the runtime agent/thread limit is reached, treat it as a scheduler event: do not duplicate the task, return the activity to the ready queue, release completed agents, reduce the observed concurrency target if needed, and retry only when capacity is available.
+Treat agent slots and worktrees independently. A completed Developer may release its agent slot only after producing a committed, clean, validated handoff. Its branch/worktree remains until review, repair, acceptance, integration, and cleanup are complete.
+
+Prefer pipelined review over batch review. If a spawn fails because the runtime limit is reached, treat it as a scheduler event: queue the activity, release completed agents, adapt concurrency, and do not duplicate the task.
 
 ## Request-type routing
 
@@ -62,13 +81,11 @@ Use the normal Simple/Complex workflow below.
 
 Read `references/bugfix.md` before diagnosis or implementation.
 
-The controller should establish, as applicable:
+Establish, as applicable:
 
 `reported symptom -> reproduction/evidence -> root cause -> bounded fix -> regression verification -> independent review`
 
 A small diff can still be **Complex** if the bug is intermittent, root cause is unknown, crosses modules, involves concurrency/lifetime/state corruption, has a large blast radius, or is difficult to validate.
-
-An obvious localized defect with a clear causal chain may use the Simple path without a separate investigation phase, but the Developer must still explain the root cause and regression verification.
 
 Do not accept a speculative symptom patch as a completed Bugfix merely because the observed failure disappears once.
 
@@ -76,97 +93,125 @@ Do not accept a speculative symptom patch as a completed Bugfix merely because t
 
 ### Simple task
 
-Use this path when the change has a clear scope, low coupling, no meaningful parallel decomposition, and a small integration surface. For Bugfix, the causal chain must also be sufficiently clear that a separate investigation phase is unnecessary.
+Use this path when the change has clear scope, low coupling, no meaningful parallel decomposition, a small integration surface, and—when Bugfix—the causal chain is sufficiently clear.
 
-`requirements/bug evidence -> Developer -> scoped build/test/regression verification -> independent Reviewer -> Developer fix/dispute -> controller arbitration/final review -> done`
+A separate worktree is not required, but by default use a workflow-owned temporary branch so the user's target branch does not receive unreviewed code. Record that branch in the Git resource ledger even though it has no extra worktree.
 
-A separate worktree is not required. Prefer a clear branch or commit boundary when practical so review and rollback remain easy.
+Canonical Simple flow:
+
+`preflight -> temporary task branch -> Developer -> commit all changes -> clean worktree -> scoped validation on TASK_HEAD -> independent Reviewer of TASK_BASE_COMMIT..TASK_HEAD -> repair/dispute -> revalidate + re-review any changed HEAD -> Controller accepts exact HEAD -> promote accepted HEAD to user target -> cleanup temporary branch`
+
+The task is ready for promotion only when:
+
+`TASK_HEAD == VALIDATED_HEAD == REVIEWED_HEAD == ACCEPTED_HEAD`
+
+If the user target moved since task start, reconcile the latest target safely before promotion. Do not resolve semantic conflicts directly on the user target and then bypass validation/review.
 
 Read:
-- `references/bugfix.md` for Bugfix tasks.
-- `references/task-contract.md` before assigning the Developer.
-- `references/worker.md` for implementation rules.
-- `references/reviewer.md` before independent review.
-- `references/quality-and-git.md` for validation and Git safety.
+- `references/code-state.md` first;
+- `references/bugfix.md` for Bugfix tasks;
+- `references/task-contract.md` before assigning the Developer;
+- `references/worker.md` for implementation rules;
+- `references/reviewer.md` before independent review;
+- `references/quality-and-git.md` for validation, promotion, and cleanup safety.
 
 ### Complex task
 
-Use this path when the change crosses modules, has uncertain impact, benefits from parallelism, changes shared interfaces/state/lifecycle, carries meaningful regression risk, or requires non-trivial bug diagnosis:
+Use this path when the change crosses modules, has uncertain impact, benefits from safe parallelism, changes shared interfaces/state/lifecycle, carries meaningful regression risk, or requires non-trivial bug diagnosis.
 
-`requirements/evidence -> Explorer or Bug Investigator -> dependency/impact/root-cause analysis -> controller decomposition -> queued parallel Developers in isolated worktrees when safe -> scoped build/test -> pipelined independent per-task Reviewers -> Developer fix/dispute -> controller arbitration -> merge -> Integration Reviewer -> clean/full validation -> controller final review -> mandatory worktree+branch cleanup gate`
+Before implementation:
 
-Before decomposition, run an exploration-only subagent. For Bugfix tasks, this agent acts as a **Bug Investigator** and must focus on reproduction evidence, causal chain, candidate root causes, and discriminating tests. It must not modify production code.
+1. run repository/Git preflight;
+2. record `USER_TARGET_BRANCH` and `TARGET_BASE_COMMIT`;
+3. run an exploration-only Explorer or Bug Investigator;
+4. build the dependency graph and hot-file map;
+5. create a workflow-owned staging branch from `TARGET_BASE_COMMIT` and record it in the Git resource ledger;
+6. create task contracts with explicit `BASE_REF`, `TASK_BASE_COMMIT`, `PREDECESSORS`, and staging `INTEGRATION_TARGET`.
 
-Read:
-- `references/bugfix.md` for Bugfix tasks.
-- `references/explorer.md` before exploration/investigation.
-- `references/agent-pool.md` before spawning parallel agents or scheduling waves.
-- `references/task-contract.md` before task assignment.
-- `references/worker.md` before development.
-- `references/reviewer.md` before per-task review.
-- `references/integration-reviewer.md` before final integration review.
-- `references/quality-and-git.md` before creating, merging, or deleting worktrees/branches and before declaring cleanup complete.
+Canonical Complex flow:
+
+`preflight -> Explorer/Bug Investigator -> dependency graph -> staging branch -> queued task Developers/worktrees -> commit-bound scoped validation -> pipelined independent per-task Reviewers -> repair/dispute -> revalidate + re-review changed HEADs -> Controller accepts exact task HEADs -> integrate ACCEPTED_HEADs into staging in topological order -> final staging validation -> Integration Review -> repair cycle if needed -> target-drift reconciliation if needed -> repeat staging validation + Integration Review if staging changed -> promote certified staging snapshot to user target -> mandatory cleanup`
+
+Per-task acceptance invariant:
+
+`TASK_HEAD == VALIDATED_HEAD == REVIEWED_HEAD == ACCEPTED_HEAD`
+
+Final staging readiness invariant:
+
+`STAGING_HEAD == STAGING_VALIDATED_HEAD == STAGING_REVIEWED_HEAD`
+
+The canonical final gate order is **validation before Integration Review**:
+
+1. record current `STAGING_HEAD`;
+2. clean/fresh build as appropriate;
+3. full tests plus relevant integration/regression/stress checks;
+4. record `STAGING_VALIDATED_HEAD`;
+5. run Integration Review over `STAGING_BASE_COMMIT..STAGING_HEAD` with validation evidence available;
+6. record `STAGING_REVIEWED_HEAD`;
+7. if any repair changes staging, invalidate stale certifications and repeat until both certify the same HEAD.
+
+Do not merge task branches directly into the user's target branch during Complex execution.
+
+Read all applicable references listed above, especially `code-state.md`, `agent-pool.md`, `quality-and-git.md`, and `integration-reviewer.md`.
 
 ## Controller responsibilities
 
-The controller must:
+The Controller must:
 
-- preserve the user's intent and acceptance criteria;
-- classify the request type and execution complexity;
-- for Bugfix, distinguish observed symptoms from proven root cause and avoid premature fixes;
-- maintain a task/dependency map for complex work;
-- maintain active/ready/blocked agent-pool state when parallel work is used;
-- avoid hardcoding a universal subagent limit and reserve practical capacity for review, investigation, and repair;
-- schedule parallel tasks in dependency-safe waves rather than spawning every decomposed task at once;
-- release completed agent threads when possible without deleting worktrees that still belong to the review/integration lifecycle;
-- record the baseline commit for complex changes before implementation begins;
-- maintain a workflow-owned Git resource ledger mapping each parallel task to its temporary worktree path, local task branch, integration target, and lifecycle state;
-- prevent overlapping workers from editing shared hot files without an explicit plan;
-- give every Developer a bounded task contract;
-- require concrete build/test evidence rather than accepting "done" claims;
-- for Bugfix, require a root-cause statement and regression verification evidence before acceptance;
-- route review findings back to the original Developer for repair or evidence-based dispute;
-- arbitrate material Developer/Reviewer disagreements;
-- review each task before merge;
-- perform or delegate safe integration and resolve conflicts without silently changing task semantics;
-- require final integration review and project-appropriate validation for complex work;
-- after final acceptance, process every workflow-owned temporary worktree/branch pair through the cleanup gate in `references/quality-and-git.md`;
-- verify that each temporary worktree is removed and each corresponding workflow-created local branch is deleted, or explicitly retain and report the resource when safe deletion cannot be proven;
-- report what changed, what was validated, material residual risks, intentionally deferred findings, and any retained temporary Git resources with reasons.
-
-## User interaction
-
-Do not overwhelm the user with internal orchestration details. Ask only when a material product/architecture choice cannot be safely inferred. For long-running multi-agent work, provide concise progress updates at meaningful milestones: exploration/investigation complete, decomposition decided, implementation/review status, integration result, final validation, and cleanup result.
-
-For Bugfix tasks, clearly distinguish facts from hypotheses. If the root cause remains uncertain, say so rather than presenting a candidate fix as proven.
+- preserve user intent and acceptance criteria;
+- classify request type and complexity;
+- preserve repository preflight state and user-owned uncommitted work;
+- for Bugfix, distinguish symptoms from proven root cause;
+- maintain the complex task/dependency map;
+- maintain active/ready/blocked agent-pool state;
+- assign every task an explicit base, predecessors, and bounded contract;
+- maintain per-task snapshot state: base, current, validated, reviewed, accepted HEADs;
+- maintain a Git resource ledger for **all** workflow-created branches/worktrees, not only worktree-backed task branches;
+- prevent hot-file overlap without an explicit plan;
+- require committed, clean Developer handoffs with validation bound to exact SHAs;
+- ensure authoritative Reviewer approval is bound to the exact final task HEAD;
+- invalidate and repeat validation/review whenever delivered code changes;
+- arbitrate Developer/Reviewer disputes without allowing arbitration to bypass re-review of changed code;
+- integrate only `ACCEPTED_HEAD` task snapshots into staging;
+- integrate dependent tasks in topological order;
+- keep the user's target branch unpolluted until the final certified result is ready;
+- run final staging validation before Integration Review and require both to certify the same staging HEAD;
+- detect user-target drift and reconcile it in staging, then rerun final gates if staging changes;
+- promote only a certified staging/task snapshot that does not acquire new unreviewed tree changes during promotion;
+- process every workflow-owned Git resource through mandatory cleanup and verify deletion or report a concrete retained-with-reason state;
+- report what changed, exact validation/review status, residual risks, deferred findings, and retained temporary Git resources.
 
 ## Failure handling
 
-If a worker fails, stalls, edits outside its task boundary, or cannot validate its work, the controller should diagnose and reassign or narrow the task rather than absorbing implementation into the main session by default.
+If a worker fails, stalls, edits outside its task boundary, cannot validate its work, or discovers an invalid base/dependency assumption, narrow/reassign/replan rather than absorbing implementation into the Controller by default.
 
-If parallel tasks turn out to have unsafe overlap, stop further parallel modification of the overlapping surface and serialize or refactor the dependency plan.
+If parallel tasks develop unsafe overlap, stop further modification of that surface and serialize or redesign the dependency plan.
 
-If the runtime refuses a new subagent because the concurrent agent/thread limit is reached, do not treat the implementation task as failed and do not spawn a duplicate. Release completed agents where possible, queue the activity, lower the observed concurrency target if needed, and continue when capacity becomes available.
+If the runtime refuses a new subagent because the agent/thread limit is reached, treat it as a scheduler event, not an implementation failure.
 
-If a Bugfix cannot be reproduced, gather alternative evidence such as logs, traces, invariants, failing tests, crash dumps, or a deterministic code-path proof. Do not fabricate reproduction. If the root cause remains unproven, classify the result as mitigation or hypothesis-driven change rather than a confirmed fix.
+If a Bugfix cannot be reproduced, use alternative evidence without fabricating reproduction. If root cause remains unproven, label the result accurately as mitigation or hypothesis-driven work.
 
-If the final integration review discovers a defect, route it to the most relevant original Developer when possible, then repeat the necessary review and validation gates.
+If a Reviewer finding causes a code change, the prior review approval is stale. Revalidate and re-review the new final HEAD.
 
-If temporary branch cleanup fails, do not use force deletion merely to make the repository look clean. Re-check whether the branch was created by this workflow, whether its worktree is clean and removed, and whether its changes are safely integrated. Prefer `git branch -d` over `git branch -D`. If safe deletion still cannot be proven, retain the branch and report the exact reason.
+If Integration Review causes a staging repair, both staging validation and review are stale for the new HEAD. Repeat the final gates.
+
+If the user target moves during the workflow, reconcile the latest target into staging and rerun the final gates before promotion.
+
+If cleanup cannot be proven safe, retain the workflow-owned resource and report the exact reason. Never force-delete uncertain or user-owned state.
 
 ## Completion criteria
 
 Do not declare the work complete until all applicable conditions hold:
 
 - user requirements and acceptance criteria are satisfied;
-- relevant project instructions were followed;
-- scoped implementation builds/tests passed;
-- for Bugfix, root cause is documented with supporting evidence or the result is explicitly labeled as mitigation when proof is unavailable;
-- for Bugfix, the original failure is covered by regression verification whenever practical;
+- project instructions were followed;
+- no workflow work is mixed with unaccounted pre-existing user changes;
+- every accepted task has `TASK_HEAD == VALIDATED_HEAD == REVIEWED_HEAD == ACCEPTED_HEAD`;
+- for Bugfix, root cause/completion state and regression evidence are accurately documented;
 - blocking review findings are resolved;
-- controller task-level review passed;
-- complex changes are merged successfully;
-- complex changes passed Integration Review;
-- project-appropriate final build/tests/regression checks passed;
-- no required review/repair activity was skipped merely because the agent pool was saturated;
-- every workflow-created temporary worktree and corresponding local task branch has been either safely deleted and verified absent, or explicitly retained with a concrete safety/audit reason reported to the user.
+- Complex task commits were integrated into workflow staging in dependency-safe order;
+- Complex staging has `STAGING_HEAD == STAGING_VALIDATED_HEAD == STAGING_REVIEWED_HEAD`;
+- target drift, if any, was reconciled before promotion and the reconciled staging snapshot was re-certified;
+- the certified result was promoted to the user target without introducing unreviewed semantic changes;
+- no required review/repair activity was skipped because the agent pool was saturated;
+- every workflow-created temporary branch/worktree—including Simple-task branches and the staging branch—was either safely deleted and verified absent or explicitly retained with a concrete reason reported to the user.
