@@ -74,6 +74,22 @@ Record:
 
 A Developer task should normally start only when `PLAN_READY = yes`.
 
+## Critical invariants
+
+For High/Critical tasks, or other tasks where correctness depends on a small number of non-obvious rules, record a concise `CRITICAL_INVARIANTS` list.
+
+Use this only for behavior that must remain true, such as:
+
+- an operation is atomic on failure;
+- rollback restores the exact prior state;
+- a receipt/handle can be consumed only once;
+- revision/version mismatch must reject the operation;
+- persisted/protocol/public behavior remains backward compatible.
+
+Normally keep this to **5-10 items or fewer**. Do not turn it into another design document.
+
+The Reviewer uses these invariants to distinguish required defects from optional hardening.
+
 ## Role, risk, and model assignment
 
 Risk and model selection serve different purposes:
@@ -95,7 +111,7 @@ List meaningful nearby refactors, API redesigns, dependency upgrades, or other c
 
 ## Relevant orchestration context
 
-Provide only what this Developer needs from Explorer/Bug Investigator output: dependencies, hot-file warnings, shared APIs, known risks, or established root-cause evidence.
+Provide only what this Developer needs from Explorer/Bug Investigator output: dependencies, critical-path information, hot-file warnings, shared APIs, known risks, or established root-cause evidence.
 
 Do not paste a large Explorer report when the Developer can read the implementation surface directly.
 
@@ -116,11 +132,17 @@ Use observable conditions covering behavior, compatibility, failure handling, an
 
 For Bugfix include the symptom/root-cause state and regression expectation.
 
-## Validation
+## Validation plan
 
-Specify the minimum relevant build target, tests, regression/stress checks, static/lint checks, or manual verification.
+Use the Validation Pyramid instead of repeatedly running the broadest available suite.
 
-For ORCHESTRATED work, validation applies to the final committed `TASK_HEAD`.
+Record only what this task needs:
+
+- **Inner-loop checks** — fastest affected-target compile and directly relevant tests/checks used while implementing or repairing;
+- **Task-gate validation** — the task-specific suite that must pass on the final committed `TASK_HEAD` before authoritative review/acceptance;
+- **Staging-owned validation** — expensive full-suite, integration, stress, real-data, or whole-project checks that should normally wait until staging unless this task specifically requires them earlier.
+
+Do not require every Developer to rerun expensive staging-owned validation independently.
 
 ## Change permissions
 
@@ -133,7 +155,7 @@ State permissions where ambiguity is risky, such as:
 - cross-module refactors;
 - diagnostic instrumentation.
 
-The default expectation is the **smallest implementation that satisfies the stated approach and acceptance criteria**.
+The default expectation is the **smallest implementation that satisfies the stated approach, Critical Invariants, and acceptance criteria**.
 
 # Developer blocked-plan handoff
 
@@ -146,6 +168,21 @@ If the Developer discovers that a key plan assumption is false, it should stop b
 
 After the Controller corrects the plan, the Developer can usually continue on Terra medium.
 
+# Repair batching
+
+When a Reviewer returns multiple compatible findings, treat them as one repair batch when practical.
+
+The Developer should:
+
+1. disposition the full finding set;
+2. fix all Confirmed required defects/approved contract gaps together when safe;
+3. add/update the related regression tests together;
+4. run the relevant inner-loop checks during repair;
+5. create a meaningful repair commit/snapshot rather than one commit per tiny finding when repository policy permits;
+6. run the Task-gate validation once on the final repaired `TASK_HEAD` before re-review.
+
+Do not implement Optional Hardening or Deferred findings unless the Controller/user explicitly accepts the scope expansion.
+
 # ORCHESTRATED Developer handoff
 
 Before handoff:
@@ -153,7 +190,7 @@ Before handoff:
 1. all intended changes are committed;
 2. task worktree is clean;
 3. `TASK_HEAD = HEAD` is recorded;
-4. required validation passes on that exact commit;
+4. required **Task-gate validation** passes on that exact commit;
 5. `VALIDATED_HEAD = TASK_HEAD` is recorded.
 
 Return:
@@ -161,6 +198,7 @@ Return:
 - implementation summary;
 - changed/added files;
 - any necessary low-level implementation decision not already fixed by the contract;
+- Critical Invariant status when applicable;
 - `TASK_BASE_COMMIT` and `TASK_HEAD`;
 - clean worktree confirmation;
 - validation commands/results and `VALIDATED_HEAD`;
@@ -170,4 +208,4 @@ Return:
 
 For difficult Bugfix work also return Symptom, Root Cause, Evidence, Fix, Regression Verification, Residual Risk, and precise completion state.
 
-The Controller rejects an ORCHESTRATED handoff whose intended code is uncommitted, whose worktree is dirty, or whose validation does not certify the final reported `TASK_HEAD`.
+The Controller rejects an ORCHESTRATED handoff whose intended code is uncommitted, whose worktree is dirty, or whose Task-gate validation does not certify the final reported `TASK_HEAD`.
