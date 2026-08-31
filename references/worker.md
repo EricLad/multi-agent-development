@@ -22,6 +22,8 @@ A plan-ready task should make these clear:
 - Non-goals;
 - Validation.
 
+For High/Critical ORCHESTRATED tasks, also understand any stated Critical Invariants.
+
 Local exploration is for confirming concrete code details, not reopening the entire architecture by default.
 
 # STANDARD Developer
@@ -50,13 +52,20 @@ Verify the assigned base/predecessors/integration target, then inspect the concr
 
 The task should normally have `PLAN_READY = yes` before implementation starts.
 
+Use the Validation Pyramid:
+
+- **Inner loop** — affected target compile + directly relevant tests/checks while coding;
+- **Task gate** — task-specific suite on the final committed `TASK_HEAD`;
+- **Staging-owned checks** — do not independently repeat expensive full/integration/real-data suites unless the contract specifically assigns them to this task.
+
 Before handoff:
 
-1. commit all intended task changes;
-2. ensure the task worktree is clean;
-3. record `TASK_HEAD = HEAD`;
-4. run required scoped validation on that exact commit;
-5. record `VALIDATED_HEAD = TASK_HEAD` when validation passes.
+1. batch the intended implementation into meaningful commits/snapshots rather than creating a commit per tiny change when repository policy permits;
+2. commit all intended task changes;
+3. ensure the task worktree is clean;
+4. record `TASK_HEAD = HEAD`;
+5. run required Task-gate validation on that exact commit;
+6. record `VALIDATED_HEAD = TASK_HEAD` when validation passes.
 
 Any delivered-content change after validation invalidates stale validation and must be committed/revalidated.
 
@@ -114,14 +123,26 @@ If the task cannot be completed safely inside its assigned boundary, report the 
 
 # Review response
 
-When an independent Reviewer is used:
+When an independent Reviewer is used, first disposition the **entire finding batch**.
 
-- **Confirmed** — fix the finding and rerun relevant validation;
+For each finding:
+
+- **Confirmed Required Defect** — fix it;
+- **Confirmed Contract Gap** — wait for/obey the Controller's clarified contract;
+- **Optional Hardening / Deferred** — do not implement unless Controller/user explicitly accepts the scope expansion;
 - **Disputed** — provide concrete code/test/API/lifetime evidence.
 
-For ORCHESTRATED work, a delivered-code change after review creates a new `TASK_HEAD`; revalidation and re-review rules from `code-state.md` apply.
+When several compatible findings are confirmed, repair them together when safe:
 
-For STANDARD work, rerun validation after a material fix and request re-review when the change materially affects what was reviewed. Do not create extra review cycles for trivial non-semantic edits unless risk warrants it.
+`full finding batch -> grouped repair -> related regression tests -> one Task-gate validation -> one re-review`
+
+Avoid one commit/test/review cycle per tiny finding when no safety benefit exists.
+
+For ORCHESTRATED work, a delivered-code change after review creates a new `TASK_HEAD`; revalidation and re-review rules from `code-state.md` still apply to the final repair snapshot.
+
+For STANDARD work, rerun validation after a material fix and request re-review when the change materially affects what was reviewed.
+
+If repeated review/repair cycles continue to expose substantial new material problems, report that the task is not converging instead of continuing unbounded hardening.
 
 # Handoff
 
@@ -129,4 +150,4 @@ Keep handoff proportional to the workflow tier.
 
 STANDARD: what changed, where, validation/result, material risk/limitation, and any corrected plan assumption.
 
-ORCHESTRATED: return the full fields required by `task-contract.md`, including commit-bound validation state.
+ORCHESTRATED: return the full fields required by `task-contract.md`, including commit-bound validation state and Critical Invariant status when applicable.
