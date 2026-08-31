@@ -17,9 +17,11 @@ The goal is to complete the change correctly with the **least orchestration nece
 4. **Plan before delegation.** A Developer should receive an implementation-ready plan instead of being asked to rediscover architecture or invent the solution.
 5. **Developer = execution agent.** For delegated implementation, prefer GPT-5.6 Terra medium when the plan is explicit. Stronger Developer models are for unresolved execution ambiguity, not simply higher risk.
 6. **Risk controls governance.** Security, concurrency/lifetime, persistence, schema/protocol, public compatibility, or large blast radius should strengthen validation/review even when Terra medium remains sufficient to implement a clear plan.
-7. Read and obey repository `AGENTS.md`, build/test instructions, architecture rules, and user constraints in every tier.
-8. Never overwrite, discard, reset, or silently absorb unrelated user changes.
-9. Do not create branches, worktrees, subagents, reviews, staging branches, or bookkeeping fields merely for workflow uniformity.
+7. **Batch expensive work.** Reviews, repairs, commits, and slow validation should be grouped when correctness permits; do not create a new review/test cycle for every small finding.
+8. **Converge, do not churn.** If repeated review/repair cycles keep discovering new material problems, stop the loop and re-check the plan, task boundary, invariants, or acceptance criteria.
+9. Read and obey repository `AGENTS.md`, build/test instructions, architecture rules, and user constraints in every tier.
+10. Never overwrite, discard, reset, or silently absorb unrelated user changes.
+11. Do not create branches, worktrees, subagents, reviews, staging branches, or bookkeeping fields merely for workflow uniformity.
 
 # Workflow tiers
 
@@ -77,7 +79,7 @@ If they are not clear, improve the plan first. Do not use a stronger Developer m
 
 Canonical flow:
 
-`Controller makes plan ready -> Terra medium Developer explores local code + implements -> targeted validation -> optional independent Reviewer when justified -> fix/revalidate if needed -> Controller final check -> done`
+`Controller makes plan ready -> Terra medium Developer explores local code + implements -> targeted validation -> optional independent Reviewer when justified -> batch fix/revalidate if needed -> Controller final check -> done`
 
 STANDARD rules:
 
@@ -86,7 +88,8 @@ STANDARD rules:
 - use the lightweight task brief from `references/task-contract.md`;
 - worktree/staging/Agent Pool are off by default;
 - temporary branch and full commit-bound SHA state are optional;
-- independent review is conditional, not automatic.
+- independent review is conditional, not automatic;
+- when review is used, prefer one complete review and one grouped repair rather than serial one-finding cycles.
 
 Request an independent Reviewer when risk/uncertainty materially justifies it, including public behavior/API compatibility, persistence, security, concurrency/lifetime, weak tests, meaningful regression surface, or Developer uncertainty.
 
@@ -112,7 +115,7 @@ Strong signals include:
 
 Do **not** use an Explorer merely because the task is called complex.
 
-Use an Explorer when the Controller needs information to orchestrate multiple tasks: ownership boundaries, hot files, dependencies, safe parallel groups, and integration/validation ownership.
+Use an Explorer when the Controller needs information to orchestrate multiple tasks: ownership boundaries, hot files, dependencies, safe parallel groups, **critical path**, and integration/validation ownership.
 
 Explorer output should make decomposition clearer; it should not duplicate the detailed implementation analysis Developers will do locally.
 
@@ -124,20 +127,22 @@ Use a separate Bug Investigator only when diagnosis itself is a substantial inde
 
 1. perform repository/Git preflight;
 2. optionally run Explorer or Bug Investigator;
-3. build dependency/ownership and risk plans;
+3. build dependency/ownership, critical-path, and risk plans;
 4. create a workflow-owned staging branch;
 5. decompose work into bounded tasks;
-6. for **each Developer task**, pass the Plan Readiness Gate before starting it;
-7. create task branches/worktrees and schedule Developers through Agent Pool only when parallelism exists;
+6. for **each Developer task**, pass the Plan Readiness Gate; for High/Critical tasks also state a short set of Critical Invariants when useful;
+7. create task branches/worktrees and schedule Developers through Agent Pool only when parallelism shortens the critical path;
 8. use **GPT-5.6 Terra medium as the default Developer** for plan-ready tasks;
-9. each Developer verifies local assumptions, implements narrowly, commits, and performs scoped validation;
-10. independently review task snapshots as required;
-11. repair and re-review changed snapshots;
-12. integrate accepted task snapshots into staging in dependency-safe order;
-13. run final staging validation and Integration Review;
-14. reconcile target drift and re-certify staging if needed;
-15. promote the certified staging result to the user target;
-16. clean workflow-created Git resources safely.
+9. each Developer verifies local assumptions, implements narrowly, commits in meaningful batches, and performs scoped validation;
+10. run one **complete batch review** per task snapshot; collect material findings before returning them;
+11. route the finding batch to the Developer for one **batch repair** when practical, then revalidate and re-review the final repaired snapshot;
+12. if a second material review/repair cycle still produces substantial new findings, run a **Convergence Gate** before continuing;
+13. integrate accepted task snapshots into staging in dependency-safe order;
+14. run final staging validation using the Validation Pyramid and then Integration Review;
+15. batch integration findings/repairs when possible; run Convergence Gate if integration review churns;
+16. reconcile target drift and re-certify staging if needed;
+17. promote the certified staging result to the user target;
+18. clean workflow-created Git resources safely.
 
 For ORCHESTRATED work, read applicable references:
 
@@ -166,6 +171,8 @@ Minimum fields:
 - Non-goals;
 - Validation.
 
+For High/Critical ORCHESTRATED work, add only the **Critical Invariants** that materially constrain correctness, normally no more than 5-10 concise items. Examples: atomic rollback, single-consumption receipt, revision mismatch rejection, compatibility preservation.
+
 For ORCHESTRATED work, also include dependencies/base/integration fields and any important permissions or risk constraints.
 
 If the plan is not ready:
@@ -175,6 +182,59 @@ If the plan is not ready:
 Do not use:
 
 `unclear plan -> stronger Developer guesses -> larger/uncontrolled diff`
+
+# Validation Pyramid
+
+Validation should increase in breadth as code approaches integration.
+
+## Inner loop
+
+During implementation and repair, run the fastest checks that directly exercise the changed surface:
+
+`affected target compile -> directly relevant tests/checks`
+
+Do not run the full project suite after every small edit unless the project makes that genuinely cheap or the failure mode requires it.
+
+## Task gate
+
+Before authoritative ORCHESTRATED task review/acceptance, validate the final committed `TASK_HEAD` with the task-specific build/test suite required by its contract.
+
+## Staging gate
+
+After accepted tasks are integrated, run the expensive broad checks once on the integrated staging snapshot: clean/fresh build as appropriate, full project tests, integration/regression/stress/real-data checks required by the project.
+
+If a later repair changes relevant semantics, rerun the invalidated level. Do not automatically rerun unrelated expensive layers.
+
+# Batch Review and Repair
+
+For a reviewable snapshot, the Reviewer should normally perform a complete pass and return the material finding set together.
+
+Do not intentionally stop after the first non-BLOCKER issue. Group compatible findings into one Developer repair batch, one validation pass, and one re-review where practical.
+
+Classify findings by both severity and disposition:
+
+- **Required Defect** — violates requirements, stated invariants, compatibility, or established correctness expectations; blocks according to severity;
+- **Contract Gap** — exposes an important missing/ambiguous requirement or invariant; Controller decides/replans before implementation continues;
+- **Optional Hardening** — defensive improvement beyond the accepted contract; normally does not block;
+- **Deferred** — valid future work intentionally left outside the current task.
+
+Review is for finding defects in the accepted contract, not for endlessly expanding that contract.
+
+# Convergence Gate
+
+Default target for ORCHESTRATED work:
+
+`implementation -> complete review -> one batch repair -> revalidation/re-review -> converge`
+
+A second material repair/re-review cycle is allowed when justified, but if substantial new BLOCKER/HIGH/MEDIUM issues continue to appear, pause normal cycling and ask:
+
+- Is the implementation approach wrong or incomplete?
+- Are Critical Invariants missing?
+- Is the task boundary too broad or incorrectly split?
+- Is the Reviewer discovering new requirements rather than defects?
+- Is validation exposing a deeper root cause or architecture problem?
+
+The Controller must replan, split, defer optional hardening, or explicitly authorize another cycle. Do not continue an unbounded fix/test/review loop by default.
 
 # Developer model routing
 
@@ -255,6 +315,21 @@ A Terra medium Developer does **not** automatically require a stronger Reviewer.
 - FAST: do not create workflow Git resources by default; preserve user work.
 - STANDARD: branch/commit boundaries are optional unless project/user/review safety requires them.
 - ORCHESTRATED: use Git resource ledger, worktrees, staging, commit-bound state, target-drift handling, and mandatory cleanup.
+- Prefer **meaningful commit batches** over one commit per tiny finding/test when the repository/user policy permits it.
+
+# Lightweight workflow metrics
+
+For long ORCHESTRATED tasks, the Controller should keep lightweight in-memory counters when practical:
+
+- approximate planning time;
+- implementation time;
+- review time;
+- repair time;
+- validation/integration time;
+- number of Developers;
+- number of material review/repair cycles.
+
+Do not create extra agents, repository files, or verbose logs solely for metrics. A concise final summary is enough. These metrics exist to identify future workflow bottlenecks.
 
 # Completion
 
