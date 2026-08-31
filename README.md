@@ -2,7 +2,7 @@
 
 一个面向 **Codex** 的自适应软件开发 Skill。
 
-`multi-agent-development` 会根据任务规模、风险和并行价值，自动选择合适的开发流程，在简单任务的开发效率与复杂任务的工程可靠性之间取得平衡。
+`multi-agent-development` 会根据任务规模、风险和并行价值选择合适的开发流程，并在委派开发前尽量把实现方案明确化，让子代理专注于高质量执行。
 
 ## 实现思路
 
@@ -51,9 +51,11 @@ FAST 模式由当前主会话直接完成代码探索、实现和验证，不额
 ```text
 Controller
   ↓
-Developer
-  ├─ 搜索 / 阅读代码
-  ├─ 实现
+明确 Goal / Scope / Implementation / Non-goals / Validation
+  ↓
+GPT-5.6 Terra medium Developer
+  ├─ 搜索 / 阅读局部代码
+  ├─ 按方案实现
   └─ Build / Test
   ↓
 必要时 Reviewer
@@ -61,9 +63,9 @@ Developer
 完成
 ```
 
-Developer 自己完成代码探索、实现和验证，不额外使用 Explorer。
+Developer 自己完成局部代码探索、实现和验证，不额外使用 Explorer。
 
-根据任务风险和不确定性，Controller 可以增加独立 Reviewer。
+在启动 Developer 前，Controller 会尽量确保方案已经具备可执行性；如果实现过程中发现关键假设不成立，Developer 返回 Controller 重新规划，而不是自行扩大设计和修改范围。
 
 适合：
 
@@ -85,11 +87,11 @@ Explorer / Bug Investigator（按需）
   ↓
 Dependency / Ownership Plan
   ↓
-Task A / Task B / Task C
+把 Task A / B / C 的方案分别明确
   ↓
 Agent Pool
   ↓
-Developer A / B / C
+Terra medium Developer A / B / C
   ↓
 Independent Review
   ↓
@@ -116,30 +118,38 @@ Cleanup
 - Integration Review；
 - 自动清理临时 worktree / branch。
 
-Explorer 主要用于分析任务之间的：
-
-- 代码所有权；
-- 依赖关系；
-- Hot Files；
-- 可并行范围；
-- 集成顺序。
-
-具体代码实现仍由各 Developer 在自己的任务范围内完成。
+Explorer 主要用于分析任务之间的代码所有权、依赖关系、Hot Files、可并行范围和集成顺序。具体实现仍由各 Developer 在自己的任务范围内完成。
 
 ---
 
-## 自适应模型路由
+## Plan Readiness
 
-使用子代理时，Skill 会根据角色和任务风险选择模型，并在必要时升级。
+STANDARD 和 ORCHESTRATED 在启动 Developer 前，会尽量明确以下内容：
+
+```text
+Goal
+Scope
+Implementation approach
+Non-goals
+Validation
+```
+
+方案明确后，默认使用 **GPT-5.6 Terra medium** 进行开发。
+
+如果方案与实际代码存在关键冲突，优先返回 Controller 重新规划；只有实现本身仍存在明显复杂歧义时，才升级 Developer 模型。
+
+## 模型路由
 
 | 角色 | 默认策略 |
 | --- | --- |
 | Explorer | Luna max |
 | Bug Investigator | Luna max → Terra xhigh / max |
-| Developer | 低风险 Luna max；普通任务 Terra xhigh；高风险 Terra max |
+| Developer | **GPT-5.6 Terra medium**；存在明显执行歧义时再升级 Terra xhigh / max |
 | Reviewer | Luna max；高风险或存在重大争议时 Terra xhigh |
 | Integration Reviewer | Terra xhigh；高风险集成 Terra max |
 | Critical Escalation | Sol xhigh / max |
+
+任务风险主要决定验证和 Review 强度；Developer 是否升级主要取决于实现方案是否仍存在难以解决的歧义。
 
 FAST 模式不会为了模型路由额外创建子代理，直接使用当前主会话模型。
 
@@ -187,14 +197,14 @@ git pull
 
 ## 使用示例
 
-在 Codex 中直接调用：
+小功能：
 
 ```text
 $multi-agent-development
 帮我给设置页面增加一个“自动检查更新”的选项。
 ```
 
-对于这种局部低风险任务，通常会自动选择 **FAST**。
+通常会选择 **FAST**。
 
 ---
 
@@ -205,7 +215,7 @@ $multi-agent-development
 给用户管理模块增加批量禁用功能，并完成必要的测试。
 ```
 
-如果一个 Developer 可以独立完成，通常会选择 **STANDARD**。
+通常会选择 **STANDARD**，由 Controller 明确方案后交给 Terra medium Developer 完成。
 
 ---
 
@@ -217,7 +227,7 @@ $multi-agent-development
 请分析依赖关系，在安全的前提下并行开发。
 ```
 
-如果任务适合拆分，会选择 **ORCHESTRATED**，并根据需要使用 Explorer、多个 Developer、worktree、Reviewer 和 Integration Review。
+如果适合拆分，会选择 **ORCHESTRATED**，先明确各子任务方案，再并行交给多个 Developer 实现。
 
 ---
 
@@ -229,7 +239,7 @@ $multi-agent-development
 请先确认根因，再完成修复和回归验证。
 ```
 
-如果根因未知、涉及并发或生命周期等复杂问题，会根据需要启用 **Bug Investigator**。
+如果根因未知、涉及并发或生命周期等复杂问题，会按需启用 **Bug Investigator**。
 
 ---
 
