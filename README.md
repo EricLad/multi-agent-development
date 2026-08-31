@@ -85,7 +85,7 @@ Controller
   ↓
 Explorer / Bug Investigator（按需）
   ↓
-Dependency / Ownership Plan
+Dependency / Ownership / Critical Path Plan
   ↓
 把 Task A / B / C 的方案分别明确
   ↓
@@ -93,7 +93,9 @@ Agent Pool
   ↓
 Terra medium Developer A / B / C
   ↓
-Independent Review
+Batch Review
+  ↓
+必要时 Batch Repair + Re-review
   ↓
 Staging
   ↓
@@ -118,7 +120,9 @@ Cleanup
 - Integration Review；
 - 自动清理临时 worktree / branch。
 
-Explorer 主要用于分析任务之间的代码所有权、依赖关系、Hot Files、可并行范围和集成顺序。具体实现仍由各 Developer 在自己的任务范围内完成。
+Explorer 主要用于分析任务之间的代码所有权、依赖关系、Hot Files、关键路径、可并行范围和集成顺序。具体实现仍由各 Developer 在自己的任务范围内完成。
+
+ORCHESTRATED 会尽量一次性收集 Review 问题并批量修复，同时采用分层验证：开发阶段运行最相关的快速检查，Task 完成时进行任务级验证，昂贵的全量/集成/真实数据验证主要集中在 staging。若多轮 Review 仍持续产生新的重大问题，Controller 会先重新检查方案和任务边界，而不是无限循环修补。
 
 ---
 
@@ -133,6 +137,8 @@ Implementation approach
 Non-goals
 Validation
 ```
+
+对于高风险 ORCHESTRATED Task，还可以补充少量 **Critical Invariants**，明确原子性、回滚、生命周期、兼容性等必须成立的关键规则。
 
 方案明确后，默认使用 **GPT-5.6 Terra medium** 进行开发。
 
@@ -227,7 +233,7 @@ $multi-agent-development
 请分析依赖关系，在安全的前提下并行开发。
 ```
 
-如果适合拆分，会选择 **ORCHESTRATED**，先明确各子任务方案，再并行交给多个 Developer 实现。
+如果适合拆分，会选择 **ORCHESTRATED**，先明确各子任务方案，再沿关键路径组织并行 Developer，并通过批量 Review、分层验证和 Integration Review 完成集成。
 
 ---
 
