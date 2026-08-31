@@ -12,7 +12,7 @@ Developers should normally search/read the code they will implement themselves. 
 
 ## Goal
 
-Return the minimum global map the Controller needs to assign work safely.
+Return the minimum global map the Controller needs to assign work safely **and shorten the real critical path**.
 
 Focus on:
 
@@ -21,9 +21,10 @@ Focus on:
 - task dependencies and required ordering;
 - safe parallel groups versus work that must remain serialized;
 - predecessor/base relationships that affect task creation;
+- **critical path** — the chain of tasks most likely to determine total wall-clock time;
 - integration order;
 - major cross-task risks;
-- validation ownership at task and integration level.
+- validation ownership at task and staging level.
 
 ## Preferred output
 
@@ -34,9 +35,10 @@ Keep the report compact:
 3. **Proposed task boundaries and owners**
 4. **Dependencies / predecessors**
 5. **Safe parallel groups**
-6. **Integration order**
-7. **Major risks**
-8. **Validation ownership**
+6. **Critical path**
+7. **Integration order**
+8. **Major risks**
+9. **Validation ownership**
 
 Example shape:
 
@@ -49,12 +51,30 @@ Task B — UI
 Owns: UserPage.*
 Depends on: Task A API
 
+Task C — tests/tools
+Owns: focused test support
+Depends on: none
+
 Hot file: UserService.cpp
 Single owner: Task A
 
 Parallel: A + C
 Serialized: B after A
+Critical path: A -> B
 ```
+
+## Parallelism rule
+
+Do not recommend parallel tasks merely because files can be separated.
+
+Parallelism is valuable when it shortens the critical path without creating disproportionate merge, review, build, or coordination cost.
+
+Prefer serialization when:
+
+- a later task depends heavily on design/output from an earlier task;
+- tasks repeatedly touch the same shared abstraction;
+- parallel work would force duplicate exploration or expensive integration repair;
+- build/test resources are the actual bottleneck rather than Developer availability.
 
 ## Avoid duplicate implementation exploration
 
