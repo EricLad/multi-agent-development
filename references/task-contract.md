@@ -3,26 +3,28 @@
 Use different contract weight by workflow tier.
 
 - **FAST**: no delegated task contract; the main session implements directly.
-- **STANDARD**: use a concise implementation-ready task brief.
+- **STANDARD**: use a concise boundary-ready task brief.
 - **ORCHESTRATED**: use the full bounded task contract below.
 
 Do not spend tokens filling fields that do not affect execution.
 
 # Plan Readiness Gate
 
-Before assigning a STANDARD or ORCHESTRATED Developer, ensure the task is sufficiently explicit for implementation.
+Before assigning a STANDARD or ORCHESTRATED Developer, ensure the task is sufficiently explicit for safe implementation.
 
 Check five items:
 
 1. **Goal** — what outcome must be produced;
 2. **Scope** — what subsystem/files/behavior the Developer owns;
-3. **Implementation approach** — the intended solution, interfaces, sequence, or important constraints;
+3. **Architectural decisions / hard constraints** — consequential choices, interfaces, compatibility rules, ownership rules, or invariants the Developer must not silently change;
 4. **Non-goals** — nearby work that must not be changed;
 5. **Validation** — how success will be verified.
 
-If these are clear enough, mark the task `PLAN_READY = yes` and prefer **GPT-5.6 Terra medium** for the Developer.
+If these are clear enough, mark the task `PLAN_READY = yes` and choose the Developer using `model-routing.md`.
 
-If a key item is unclear, do not ask the Developer to invent the architecture. The Controller should clarify/replan first, using repository exploration, Explorer, or Bug Investigator only when they add concrete value.
+Do **not** require the Controller to prescribe routine local tactics when repository evidence can resolve them safely. The Developer may choose existing helpers, local file structure, exact implementation sequence, and other reversible details inside the accepted boundary.
+
+If a consequential item is unclear, do not ask the Developer to invent public architecture or contracts. The Controller should clarify/replan first, using repository exploration, Explorer, or Bug Investigator only when they add concrete value.
 
 # STANDARD lightweight task brief
 
@@ -30,13 +32,13 @@ A STANDARD Developer normally needs only:
 
 - **Goal**;
 - **Scope**;
-- **Implementation approach**;
+- **Architectural decisions / hard constraints** — only when material;
 - **Out of scope / non-goals**;
 - **Acceptance criteria**;
 - **Validation**;
 - **Risk note** — only material risk that changes validation/review behavior.
 
-The Developer is expected to perform their own local code exploration inside this scope and verify that the plan matches the repository before editing.
+The Developer is expected to perform local code exploration inside this scope, verify the boundary against repository evidence, and choose routine implementation tactics without unnecessary Controller round-trips.
 
 Do not require ORCHESTRATED Git fields, dependency graphs, model-audit fields, worktree data, or commit-state bookkeeping unless the STANDARD task specifically needs them.
 
@@ -46,7 +48,7 @@ A STANDARD handoff should normally contain:
 2. files/surfaces changed;
 3. validation performed and result;
 4. notable risk/limitation;
-5. any plan assumption that proved false or required Controller clarification;
+5. any consequential plan assumption that proved false or required Controller clarification;
 6. for Bugfix, root cause and regression verification when material.
 
 # ORCHESTRATED full task contract
@@ -68,11 +70,15 @@ For a difficult Bugfix, include the current evidence/root-cause status from `bug
 Record:
 
 - `PLAN_READY` — yes/no;
-- `IMPLEMENTATION_APPROACH` — concise intended solution;
+- `ARCHITECTURAL_DECISIONS` — only consequential decisions or hard constraints the Developer must preserve;
 - `NON_GOALS` — meaningful nearby work to avoid;
-- `EXECUTION_AMBIGUITY` — Low / Medium / High when material.
+- `EXECUTION_AMBIGUITY` — Low / Medium / High when material;
+- `TASK_HORIZON` — Short / Medium / Long when it affects routing;
+- `INTEGRATION_BREADTH` — Local / Subsystem / Cross-system when it affects routing.
 
 A Developer task should normally start only when `PLAN_READY = yes`.
+
+Do not turn `ARCHITECTURAL_DECISIONS` into a line-by-line implementation recipe. Local tactics belong to the Developer unless changing them would alter architecture, public behavior, compatibility, persisted data, security boundaries, ownership/lifetime contracts, or other consequential behavior.
 
 ## Critical invariants
 
@@ -95,11 +101,18 @@ The Reviewer uses these invariants to distinguish required defects from optional
 Risk and model selection serve different purposes:
 
 - `RISK_LEVEL` — Low / Medium / High / Critical; primarily affects governance, validation, and review strength;
-- `ASSIGNED_MODEL` — Developer default is **GPT-5.6 Terra medium** when the task is implementation-ready;
-- `MODEL_RATIONALE` — required when the Developer is upgraded above Terra medium;
-- `ESCALATION_REASON` — populated when unresolved execution ambiguity requires a stronger tier.
+- `EXECUTION_AMBIGUITY` — remaining implementation reasoning difficulty;
+- `TASK_HORIZON` — continuity requirement;
+- `INTEGRATION_BREADTH` — interaction breadth;
+- `COST_SENSITIVITY` — only when it materially affects routing;
+- `ASSIGNED_MODEL`;
+- `REASONING_EFFORT` — when the runtime/model exposes it and it matters;
+- `MODEL_RATIONALE` — required when the routing choice is non-obvious;
+- `ESCALATION_REASON` — populated when evidence justifies a stronger model or reasoning effort.
 
-Do not upgrade the Developer only because `RISK_LEVEL` is High. A high-risk but explicit implementation can remain on Terra medium with stronger validation/review.
+Do not upgrade the Developer only because `RISK_LEVEL` is High. A high-risk but explicit implementation can remain on a cost-efficient model with stronger validation/review.
+
+Conversely, long-horizon or Cross-system work may justify GPT-6 Astra even when the change is not Critical.
 
 ## Scope
 
@@ -111,9 +124,9 @@ List meaningful nearby refactors, API redesigns, dependency upgrades, or other c
 
 ## Relevant orchestration context
 
-Provide only what this Developer needs from Explorer/Bug Investigator output: dependencies, critical-path information, hot-file warnings, shared APIs, known risks, or established root-cause evidence.
+Provide only what this Developer needs from Explorer/Bug Investigator output: dependencies, critical-path information, hot-file warnings, shared APIs, known risks, established root-cause evidence, and consequential decisions.
 
-Do not paste a large Explorer report when the Developer can read the implementation surface directly.
+Do not paste a large Explorer report when the Developer can read the implementation surface directly or retained/searchable context already contains the evidence.
 
 ## Git base and dependencies
 
@@ -142,6 +155,8 @@ Record only what this task needs:
 - **Task-gate validation** — the task-specific suite that must pass on the final committed `TASK_HEAD` before authoritative review/acceptance;
 - **Staging-owned validation** — expensive full-suite, integration, stress, real-data, or whole-project checks that should normally wait until staging unless this task specifically requires them earlier.
 
+Once required targeted checks pass, do not broaden or repeat validation unless later changes, failures, or concrete unresolved risk invalidate that evidence.
+
 Do not require every Developer to rerun expensive staging-owned validation independently.
 
 ## Change permissions
@@ -155,18 +170,34 @@ State permissions where ambiguity is risky, such as:
 - cross-module refactors;
 - diagnostic instrumentation.
 
-The default expectation is the **smallest implementation that satisfies the stated approach, Critical Invariants, and acceptance criteria**.
+The default expectation is the **smallest implementation that satisfies the stated boundary, Critical Invariants, and acceptance criteria**.
 
-# Developer blocked-plan handoff
+# Developer blocked-boundary handoff
 
-If the Developer discovers that a key plan assumption is false, it should stop before broad redesign and return:
+If the Developer discovers that a consequential assumption is false, it should not silently redesign the affected boundary.
+
+First identify whether other work can continue safely.
+
+Return:
 
 - **Expected** — what the task contract assumed;
 - **Actual** — what the repository shows;
-- **Impact** — why the current plan cannot be followed safely;
+- **Impact** — why the affected slice cannot follow the current boundary safely;
+- **Blocked slice** — work that must wait for a decision;
+- **Independent work** — reversible work that can safely continue without prejudging the decision, if any;
 - **Decision needed** — the smallest Controller decision/replan required.
 
-After the Controller corrects the plan, the Developer can usually continue on Terra medium.
+If the runtime supports asking for a consequential decision while continuing independent work, prefer that over idling the entire task.
+
+Do not invoke this handoff for routine local implementation details that project conventions can resolve safely.
+
+# Context continuity
+
+For long-running tasks, preserve useful role-owned context when it reduces rediscovery.
+
+A Developer should normally keep the same context across implementation and compatible repair work. A Controller may keep long-lived orchestration state. Split contexts when parallel ownership, independent review, Git isolation, or a fresh perspective provides concrete value.
+
+Do not use context continuity to weaken read-only Reviewer boundaries or mix unrelated task ownership.
 
 # Repair batching
 
@@ -180,6 +211,8 @@ The Developer should:
 4. run the relevant inner-loop checks during repair;
 5. create a meaningful repair commit/snapshot rather than one commit per tiny finding when repository policy permits;
 6. run the Task-gate validation once on the final repaired `TASK_HEAD` before re-review.
+
+Prefer returning the repair batch to the same Developer context when that context still owns the task and retains useful state. Create a fresh repair agent only when availability, independence, isolation, or lost context justifies it.
 
 Do not implement Optional Hardening or Deferred findings unless the Controller/user explicitly accepts the scope expansion.
 
@@ -197,13 +230,13 @@ Return:
 
 - implementation summary;
 - changed/added files;
-- any necessary low-level implementation decision not already fixed by the contract;
+- any necessary local implementation decision that affects later integration understanding;
 - Critical Invariant status when applicable;
 - `TASK_BASE_COMMIT` and `TASK_HEAD`;
 - clean worktree confirmation;
 - validation commands/results and `VALIDATED_HEAD`;
 - limitations/residual risks;
-- contract deviations or corrected plan assumptions;
+- contract deviations or corrected consequential assumptions;
 - branch/worktree state.
 
 For difficult Bugfix work also return Symptom, Root Cause, Evidence, Fix, Regression Verification, Residual Risk, and precise completion state.
