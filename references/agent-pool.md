@@ -10,6 +10,8 @@ The goal is reliable parallel throughput, not maximum fan-out.
 
 **Schedule to shorten the critical path, not to maximize active-agent count.**
 
+Do not rely on the current model to volunteer parallelism. When two or more independent Ready tasks lie on, unblock, or materially shorten the critical path, the Controller should explicitly consider parallel delegation and use it when expected wall-clock savings exceed coordination, review, build, and merge costs.
+
 Do not hardcode a universal Codex concurrency limit. If the runtime exposes a limit, respect it. Otherwise start conservatively and adapt from observed capacity.
 
 ## What consumes capacity
@@ -48,9 +50,10 @@ Do not spawn all decomposed tasks merely because they exist.
 When Explorer/Controller identifies a critical path:
 
 1. keep critical-path tasks unblocked whenever possible;
-2. start off-path parallel work only when it will not delay critical-path review, repair, build, or integration;
-3. avoid speculative fan-out whose output cannot be integrated until a predecessor stabilizes;
-4. prefer one clear owner over parallel work that creates hot-file or shared-interface churn.
+2. explicitly parallelize independent Ready work when it will shorten the critical path and coordination cost is lower than the expected saving;
+3. start off-path parallel work only when it will not delay critical-path review, repair, build, or integration;
+4. avoid speculative fan-out whose output cannot be integrated until a predecessor stabilizes;
+5. prefer one clear owner over parallel work that creates hot-file or shared-interface churn.
 
 Agent availability alone is not sufficient reason to start a task.
 
@@ -69,11 +72,13 @@ This prevents review starvation and reduces wall-clock delay on the path that de
 
 ## Pipeline review
 
-When a Developer completes a committed/validated ORCHESTRATED handoff, release its agent slot when possible while retaining its branch/worktree. Start the Reviewer when capacity allows while other independent Developers continue.
+When a Developer completes a committed/validated ORCHESTRATED handoff, release its active execution slot when possible while retaining its branch/worktree and role-owned context if compatible repair work may return to it.
 
-Reviewer findings should normally arrive as one batch. Prefer one grouped repair agent/session for compatible findings rather than repeatedly occupying slots for tiny serial repair cycles.
+Start the Reviewer when capacity allows while other independent Developers continue.
 
-Agent lifecycle and worktree lifecycle are independent.
+Reviewer findings should normally arrive as one batch. Prefer one grouped repair pass for compatible findings rather than repeatedly occupying slots for tiny serial repair cycles. When practical, return that repair to the same Developer context because it already owns the implementation evidence; create a fresh repair agent only when independence, availability, isolation, or lost context justifies it.
+
+Agent execution lifecycle, retained context, and worktree lifecycle are related but not identical. Do not delete useful task state merely to free an active slot when the runtime allows safe retention.
 
 ## Convergence handling
 
@@ -87,8 +92,8 @@ If substantial new BLOCKER/HIGH/MEDIUM findings continue after a second material
 
 - stop automatically scheduling another repair loop;
 - mark the task `Blocked: Convergence Gate`;
-- return it to the Controller for plan/invariant/task-boundary review;
-- resume only after the Controller explicitly replans, splits, defers scope, or authorizes another cycle.
+- return it to the Controller for plan/invariant/task-boundary/model-capability review;
+- resume only after the Controller explicitly replans, splits, defers scope, escalates reasoning when justified, or authorizes another cycle.
 
 This prevents review backlog and agent capacity from being consumed by unbounded hardening loops.
 
@@ -97,7 +102,7 @@ This prevents review backlog and agent capacity from being consumed by unbounded
 If spawning fails because the runtime limit is reached:
 
 1. do not duplicate the task;
-2. release completed agents when safe;
+2. release completed active agents when safe;
 3. return the activity to Ready;
 4. lower observed concurrency if necessary;
 5. retry only after capacity becomes available.
