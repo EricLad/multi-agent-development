@@ -1,12 +1,65 @@
-# Role + Execution-Ambiguity Model Routing
+# Capability + Cost Model Routing
 
-Apply model routing only when subagents are actually used. Do not create subagents or bookkeeping solely to exercise this policy.
+Apply model routing only when subagents are actually useful. Do not create subagents or bookkeeping solely to exercise this policy.
 
 The central rule is:
 
-> **Risk controls governance; execution ambiguity controls Developer model escalation.**
+> **Risk controls governance; execution ambiguity, task horizon, integration breadth, expected iteration cost, and cost sensitivity control model choice.**
 
-A high-risk task does not automatically need a stronger Developer when the implementation plan is already explicit. Instead, high risk should normally strengthen validation and review. Upgrade the Developer only when the implementation itself still requires materially harder reasoning.
+A high-risk task does not automatically need the most capable Developer when the implementation boundary is explicit. Conversely, a low-risk task may still justify a stronger model when the work is long-horizon, cross-system, or repeatedly fails to converge.
+
+# Routing dimensions
+
+Use only the fields that materially affect the decision:
+
+- `RISK_LEVEL` — Low / Medium / High / Critical; drives review, validation, isolation, and approval strength.
+- `EXECUTION_AMBIGUITY` — Low / Medium / High; how much consequential implementation reasoning remains.
+- `TASK_HORIZON` — Short / Medium / Long; how much state and goal continuity the task requires.
+- `INTEGRATION_BREADTH` — Local / Subsystem / Cross-system; how widely correctness depends on interactions.
+- `COST_SENSITIVITY` — Low / Medium / High when model cost materially matters.
+- `ASSIGNED_MODEL` and, when relevant, `REASONING_EFFORT`.
+- `MODEL_RATIONALE` when the selected path is not obvious.
+
+# Model families
+
+Use current runtime availability rather than assuming every installation exposes every model.
+
+## GPT-5.6 Terra
+
+Use Terra as the cost/performance execution path for clear, bounded coding work.
+
+Good fit:
+
+- plan-ready routine features;
+- bounded multi-file implementation;
+- clear ORCHESTRATED subtasks;
+- straightforward review repairs;
+- high-risk tasks whose consequential architecture is already decided and whose implementation itself is not unusually difficult.
+
+Default tendency: **Terra medium**.
+
+Escalate within the GPT-5.6 family only when Astra is unavailable or a project/runtime policy specifically favors the older family.
+
+## GPT-6 Astra
+
+Use Astra when the dominant cost is cognition, continuity, or repeated reasoning failure rather than raw implementation volume.
+
+Strong signals:
+
+- long-horizon end-to-end work;
+- cross-system implementation where many interacting constraints must remain active;
+- materially ambiguous implementation after reasonable Controller planning;
+- difficult architecture-to-code reconciliation;
+- stubborn multi-hypothesis debugging;
+- concurrency/lifetime/state-machine/data-integrity semantics;
+- broad integration review;
+- repeated non-convergence where restarting weaker agents would discard useful context.
+
+Start with the lowest reasoning effort that is likely to solve the task. Typical progression when supported:
+
+`Astra medium -> high -> xhigh -> max`
+
+Do not jump directly to max merely because the task is important.
 
 # Workflow-tier interaction
 
@@ -14,143 +67,193 @@ A high-risk task does not automatically need a stronger Developer when the imple
 
 No delegated-role routing by default. Use the current main-session model and keep the task in one coding context.
 
+Do not create a stronger subagent merely because one exists.
+
 ## STANDARD
 
 Use one Developer when delegation is useful.
 
-Default:
+Typical routing:
 
-- **Developer -> GPT-5.6 Terra medium**
+- bounded + Low execution ambiguity + Short/Medium horizon -> **Terra medium**;
+- materially ambiguous or Long-horizon Subsystem work -> **Astra medium/high** when available;
+- difficult unresolved semantics -> increase Astra reasoning before replacing the context when practical.
 
-Use an independent Reviewer only when risk, uncertainty, weak tests, or public behavior justifies it.
+Independent review remains conditional on risk and uncertainty.
 
 ## ORCHESTRATED
 
-After the Controller makes each task implementation-ready, use:
+Route each task independently after its boundary is ready.
 
-- **Developer -> GPT-5.6 Terra medium by default**
-- stronger Developer models only when execution ambiguity remains or new evidence invalidates the plan
+Decomposition should make most implementation tasks simpler. That often keeps routine Developers on Terra even when the overall program is complex.
 
-The purpose of decomposition is to turn complex work into clear bounded implementation tasks that Terra medium can execute efficiently.
+Use Astra selectively for tasks whose own local reasoning remains hard, for long-lived Controller/integration contexts, or for difficult diagnosis/review.
 
 # Plan Readiness before Developer assignment
 
-Do not compensate for an unclear task by immediately selecting a stronger Developer model.
+Do not compensate for an unclear consequential boundary by immediately selecting a stronger Developer.
 
-Before starting a STANDARD or ORCHESTRATED Developer, the Controller should ensure the plan is sufficiently explicit:
+Before starting a STANDARD or ORCHESTRATED Developer, the Controller should ensure:
 
-1. **Goal** — the required outcome is clear;
+1. **Goal** — required outcome is clear;
 2. **Scope** — ownership/files/subsystem boundary is clear enough;
-3. **Implementation approach** — the intended solution and important constraints are stated;
-4. **Non-goals** — nearby work that must not be changed is clear;
-5. **Validation** — success can be checked with concrete build/test/behavior verification.
+3. **Architectural decisions / hard constraints** — consequential choices the Developer must not silently change are explicit;
+4. **Non-goals** — meaningful nearby work to avoid is clear;
+5. **Validation** — success can be checked concretely.
 
-When these are satisfied, treat the task as `PLAN_READY` and prefer Terra medium.
-
-If they are not satisfied, improve the plan first using the Controller, repository exploration, or Bug Investigator/Explorer when genuinely needed.
+Routine local tactics do not need to be pre-specified when repository evidence can resolve them safely. The Developer may choose helpers, local structure, exact edit sequence, and similar reversible details inside the accepted boundary.
 
 # Developer routing
 
-## Default: Terra medium
+## Route A: bounded execution
 
-Use **GPT-5.6 Terra medium** for normal Developer work when the task is implementation-ready, including:
+Prefer **GPT-5.6 Terra medium** when:
 
-- ordinary production features;
-- bounded multi-file changes;
-- ORCHESTRATED subtasks with clear ownership and interfaces;
-- high-risk changes whose design/algorithm/compatibility strategy has already been decided and whose implementation is concrete;
-- review-finding repairs when the required correction is clear.
+- `EXECUTION_AMBIGUITY = Low`;
+- horizon is Short or Medium;
+- integration breadth is Local or Subsystem;
+- architecture/public behavior is already constrained where necessary;
+- expected rework is low.
 
-The Developer is an **implementation agent**, not a second architect. It should verify the plan against the local code, implement narrowly, validate, and avoid inventing additional abstractions or unrelated refactors.
+This remains the default cost-efficient production path.
 
-## Escalate to Terra xhigh
+## Route B: cognition-dominant execution
 
-Upgrade the Developer to **Terra xhigh** when implementation remains materially ambiguous after reasonable local inspection, for example:
+Prefer **GPT-6 Astra medium/high** when one or more of these materially dominate the task:
 
-- the task contract conflicts with the actual architecture;
-- multiple implementation strategies remain and choosing among them materially affects architecture or compatibility;
-- a required API/ownership/lifecycle assumption is false;
-- repeated build/test failures do not converge to a localized cause;
-- unexpected cross-module coupling appears and cannot be resolved by a small plan correction;
-- the Developer would otherwise need to redesign the task rather than implement it.
+- Long task horizon;
+- Cross-system breadth;
+- consequential implementation ambiguity remains after planning;
+- many interacting invariants must be preserved simultaneously;
+- the task requires sustained reasoning across code search, implementation, validation, and repair;
+- prior lower-cost attempts failed to converge.
 
-Prefer returning the problem to the Controller for replanning when possible. Escalation is appropriate when the unresolved reasoning belongs inside the implementation task itself.
+Choose `medium` when the task is long but structurally clear; choose `high` when consequential reasoning remains substantial.
 
-## Escalate to Terra max / Sol
+## Route C: difficult unresolved semantics
 
-Use **Terra max** only when the implementation itself requires unusually difficult reasoning such as unresolved concurrency/lifetime/state-machine interactions, subtle memory/resource safety, or similarly difficult semantics.
+Escalate Astra to `xhigh` or `max` only for genuinely difficult reasoning such as:
 
-Use **Sol xhigh/max** only for Critical or repeatedly unresolved implementation problems where lower tiers have failed to converge.
+- unresolved concurrency/lifetime/resource-safety interactions;
+- subtle state-machine or persistence consistency problems;
+- repeated non-convergence after a sound plan and meaningful evidence;
+- difficult integration conflicts where local fixes interact in non-obvious ways.
 
-Do not escalate merely because the task is high risk, long, or spans many lines.
+Before escalating, check whether the real problem is a bad task boundary, missing invariant, or incorrect architecture assumption.
+
+# Reasoning-effort escalation
+
+When the runtime can adjust reasoning effort while preserving the same useful context, prefer:
+
+`same Astra context + higher reasoning effort`
+
+over
+`discard context + spawn a replacement agent`
+
+when all of the following hold:
+
+- the same role still owns the work;
+- the current context contains valuable repository/diagnostic state;
+- the problem is insufficient reasoning depth rather than independence or isolation;
+- no read-only or independent-review boundary would be weakened.
+
+Create a fresh agent when independence, parallel ownership, clean review perspective, Git isolation, or a genuinely different role provides value.
 
 # Other role routing
 
+## Controller
+
+Use the current main-session model by default.
+
+For long ORCHESTRATED programs with extensive cross-system reasoning, a GPT-6 Astra Controller is preferred when available and cost is justified because preserving orchestration state can reduce repeated rediscovery.
+
+Do not create a separate Controller subagent solely for model selection.
+
 ## Explorer
 
-Default: **Luna max**.
+Use a lower-cost capable model for bounded ownership/dependency mapping.
 
-Escalate to Terra xhigh only when the orchestration map itself needs difficult architectural/ownership inference.
+- routine locate/map work -> Luna or Terra class;
+- difficult architectural/ownership inference across a large codebase -> Astra medium/high when justified.
 
-Explorer remains optional and should exist only when decomposition/orchestration needs a global map.
+Explorer remains optional.
 
 ## Bug Investigator
 
-- straightforward diagnosis -> Luna max;
-- non-trivial cross-module/root-cause work -> Terra xhigh;
-- concurrency/lifetime/state corruption or stubborn multi-hypothesis diagnosis -> Terra max;
-- Critical/repeatedly unresolved -> Sol xhigh/max.
+- straightforward diagnosis -> lower-cost capable model;
+- non-trivial cross-module/root-cause work -> Terra high/xhigh or Astra medium depending runtime availability and expected horizon;
+- long-horizon multi-hypothesis, concurrency/lifetime/state corruption -> **Astra high/xhigh**;
+- Critical/repeatedly unresolved -> Astra max only after boundary/invariant review.
 
-The Investigator should resolve uncertainty before implementation when possible so the resulting Developer task can return to Terra medium.
+The Investigator should resolve uncertainty before implementation when possible, but do not split diagnosis from implementation when one context can safely own both.
 
 ## Reviewer
 
-Default: **Luna max**.
+Route by defect-finding difficulty, not by Developer model name.
 
-Escalate to **Terra xhigh** for High/Critical risk, material uncertainty, security/concurrency/lifetime/schema/protocol/broad public behavior, or difficult evidence-based disputes.
-
-A Terra medium Developer does not automatically require a stronger Reviewer. Review tier is determined by the risk and difficulty of finding defects, not by the Developer's model name.
+- bounded ordinary review -> Luna/Terra class;
+- High-risk security/concurrency/schema/protocol/public-behavior review -> Terra high/xhigh or Astra medium/high;
+- long, broad, evidence-heavy review -> prefer Astra when continuity and cross-file reasoning dominate.
 
 ## Integration Reviewer
 
-Default: **Terra xhigh**.
+- bounded integrated change -> Terra xhigh or equivalent capable model;
+- broad Cross-system integration, difficult conflict resolution, concurrency/security/data-migration interactions -> **Astra high/xhigh**;
+- repeatedly unresolved Critical integration -> Astra max only when justified.
 
-Escalate to Terra max for High-risk integrated changes, meaningful conflict resolution, broad coupling, concurrency/security/data-migration concerns. Sol is reserved for Critical/unresolved integration uncertainty.
+# Developer blocked-boundary rule
 
-# Developer blocked-plan rule
+When a Developer discovers a consequential assumption is false, it should not silently redesign the solution or expand scope.
 
-When a Developer discovers that a key plan assumption is wrong, it should not silently redesign the solution or expand scope.
-
-Return a concise block report containing:
+Return:
 
 - expected assumption;
 - actual repository evidence;
-- why the current plan cannot be followed safely;
-- smallest decision or plan correction needed.
+- affected/blocked slice;
+- independent work that can safely continue, if any;
+- why a decision is needed;
+- smallest Controller correction required.
 
-The Controller then replans, after which the same Terra medium Developer tier may often continue.
+If the runtime supports asking while continuing unrelated work, use that capability for consequential questions rather than idling the whole task.
+
+Routine local choices should be resolved from repository conventions without escalation.
+
+# Context continuity
+
+Long context is useful only when it preserves relevant state.
+
+Prefer maintaining the same context for:
+
+- one Developer's implementation plus compatible repair work;
+- a long-lived Controller's orchestration state;
+- difficult diagnosis where hypotheses/evidence accumulate over time.
+
+Split contexts for:
+
+- independent review;
+- parallel ownership;
+- Git isolation;
+- unrelated tasks;
+- deliberate fresh-perspective diagnosis.
+
+Do not repeatedly paste full Explorer reports or history when stable boundaries/invariants plus searchable retained context are sufficient.
+
+# Fallback when Astra is unavailable
+
+Preserve the routing **intent**, not the exact model name.
+
+For Astra-class tasks, choose the strongest available GPT-5.6 path appropriate to the same reasoning requirement, typically Terra high/xhigh/max or Sol for the hardest unresolved work.
+
+Do not downgrade governance merely because the preferred model is unavailable.
 
 # Cost and quality control
 
-Prefer this sequence:
+Prefer:
 
-`make plan explicit -> Terra medium implements -> validate -> review proportional to risk`
+`make consequential boundary explicit -> choose cheapest capable model -> preserve useful context -> validate -> review proportional to risk -> escalate reasoning only when evidence justifies it`
 
 not:
 
-`unclear plan -> stronger Developer guesses -> larger diff -> more review`
+`unclear plan -> strongest model by default -> repeated handoffs -> larger diff -> repeated full validation`
 
-Use stronger models for unresolved reasoning, not as a substitute for task clarity.
-
-# Audit fields
-
-Keep bookkeeping proportional to the workflow. For ORCHESTRATED work, record when useful:
-
-- `RISK_LEVEL` — for governance/review decisions;
-- `PLAN_READY` — yes/no;
-- `EXECUTION_AMBIGUITY` — Low / Medium / High when material;
-- `ASSIGNED_MODEL`;
-- `MODEL_RATIONALE` when not using Terra medium for a Developer;
-- `ESCALATION_REASON` when upgraded.
-
-These fields are not completion ceremony for FAST/STANDARD.
+Model routing is an optimization layer. Correctness, user requirements, project constraints, and safe Git behavior remain authoritative.
