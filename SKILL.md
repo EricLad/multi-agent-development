@@ -1,27 +1,30 @@
 ---
 name: multi-agent-development
-description: Orchestrate Codex software development with progressive governance. Choose the lightest sufficient workflow: FAST for small low-risk edits handled directly by the main session, STANDARD for one-Developer work with inline exploration and optional review, and ORCHESTRATED for complex, parallel, high-risk, or hard-to-diagnose work. Delegated Developers default to GPT-5.6 Terra medium once the Controller has made the implementation plan explicit.
+description: Orchestrate Codex software development with progressive governance. Choose the lightest sufficient workflow: FAST for small low-risk edits handled directly by the main session, STANDARD for one-Developer work with inline exploration and optional review, and ORCHESTRATED for complex, parallel, high-risk, or hard-to-diagnose work. Route models by execution ambiguity, task horizon, integration breadth, and cost instead of hardcoding one model for every delegated task.
 ---
 
 # Multi-Agent Development
 
 Use **progressive governance**: apply only the process whose safety benefit exceeds its coordination cost.
 
-The goal is to complete the change correctly with the **least orchestration necessary**.
+The goal is to complete the change correctly with the **least orchestration necessary** while preserving useful context and shortening the actual critical path.
 
 ## Core principles
 
 1. **Exploration is required; a separate Explorer is optional.** Whoever implements the code should normally search, read, and understand the relevant code themselves.
-2. **Prefer one context when one context is enough.** Do not split understanding and implementation across agents without concrete orchestration or investigation value.
+2. **Prefer one context when one context is enough.** Strong long-horizon models make unnecessary handoffs more expensive, not more valuable.
 3. **Choose FAST, STANDARD, or ORCHESTRATED before implementation.** Start with the lightest safe tier and upgrade only when evidence justifies it.
-4. **Plan before delegation.** A Developer should receive an implementation-ready plan instead of being asked to rediscover architecture or invent the solution.
-5. **Developer = execution agent.** For delegated implementation, prefer GPT-5.6 Terra medium when the plan is explicit. Stronger Developer models are for unresolved execution ambiguity, not simply higher risk.
-6. **Risk controls governance.** Security, concurrency/lifetime, persistence, schema/protocol, public compatibility, or large blast radius should strengthen validation/review even when Terra medium remains sufficient to implement a clear plan.
-7. **Batch expensive work.** Reviews, repairs, commits, and slow validation should be grouped when correctness permits; do not create a new review/test cycle for every small finding.
-8. **Converge, do not churn.** If repeated review/repair cycles keep discovering new material problems, stop the loop and re-check the plan, task boundary, invariants, or acceptance criteria.
-9. Read and obey repository `AGENTS.md`, build/test instructions, architecture rules, and user constraints in every tier.
-10. Never overwrite, discard, reset, or silently absorb unrelated user changes.
-11. Do not create branches, worktrees, subagents, reviews, staging branches, or bookkeeping fields merely for workflow uniformity.
+4. **Define outcomes and boundaries before delegation.** The Controller owns consequential architecture, public behavior, critical invariants, scope, and validation ownership; the Developer may choose routine local implementation tactics inside those boundaries.
+5. **Route by capability, not model name alone.** Execution ambiguity, task horizon, integration breadth, expected iteration cost, and cost sensitivity determine model choice.
+6. **Use cost-efficient models for bounded execution.** GPT-5.6 Terra remains a strong default for clear, plan-ready implementation where long-horizon reasoning is not the bottleneck.
+7. **Use GPT-6 Astra where cognition dominates coordination.** Prefer Astra for long-horizon, cross-system, highly ambiguous, difficult integration, or repeatedly non-convergent work when available and justified.
+8. **Escalate reasoning before multiplying handoffs.** When the runtime supports it, increase Astra reasoning effort within the same long-lived context before discarding useful state or spawning replacement agents solely for more reasoning power.
+9. **Risk controls governance.** Security, concurrency/lifetime, persistence, schema/protocol, public compatibility, or large blast radius should strengthen validation/review even when a cost-efficient Developer remains sufficient.
+10. **Batch expensive work.** Reviews, repairs, commits, and slow validation should be grouped when correctness permits.
+11. **Converge, do not churn.** Repeated material review/repair failures trigger replanning rather than unbounded loops.
+12. Read and obey repository `AGENTS.md`, build/test instructions, architecture rules, and user constraints in every tier.
+13. Never overwrite, discard, reset, or silently absorb unrelated user changes.
+14. Do not create branches, worktrees, subagents, reviews, staging branches, or bookkeeping fields merely for workflow uniformity.
 
 # Workflow tiers
 
@@ -46,9 +49,10 @@ FAST rules:
 - no independent Reviewer by default;
 - no Agent Pool, worktree, staging branch, mandatory temporary branch, or commit/SHA state machine;
 - keep validation proportional to the change;
+- once required targeted checks pass, do not broaden or repeat validation unless later changes, failures, or concrete unresolved risk invalidate that evidence;
 - do not load heavy ORCHESTRATED references unless the task upgrades.
 
-If implementation reveals broader coupling, uncertain behavior, meaningful risk, or difficult diagnosis, upgrade to STANDARD or ORCHESTRATED.
+If implementation reveals broader coupling, consequential ambiguity, meaningful risk, or difficult diagnosis, upgrade to STANDARD or ORCHESTRATED.
 
 ## STANDARD
 
@@ -67,24 +71,24 @@ Before starting the Developer, ensure these are clear enough:
 
 1. **Goal** — required outcome;
 2. **Scope** — owned subsystem/files/behavior;
-3. **Implementation approach** — intended solution and important constraints;
+3. **Architectural decisions / hard constraints** — only decisions the Developer must not silently change;
 4. **Non-goals** — nearby work that must not be changed;
 5. **Validation** — concrete success checks.
 
-If they are clear, treat the task as `PLAN_READY` and use **GPT-5.6 Terra medium** by default.
+The Controller does **not** need to prescribe routine local implementation tactics when repository evidence can resolve them safely. A Developer may choose helpers, file-local structure, exact edit sequence, and similarly reversible details inside the accepted boundary.
 
-If they are not clear, improve the plan first. Do not use a stronger Developer model merely to compensate for an unclear task.
+If these fields are clear, treat the task as `PLAN_READY` and route the Developer by capability/cost rather than by risk alone.
 
 ### STANDARD execution
 
 Canonical flow:
 
-`Controller makes plan ready -> Terra medium Developer explores local code + implements -> targeted validation -> optional independent Reviewer when justified -> batch fix/revalidate if needed -> Controller final check -> done`
+`Controller makes boundary ready -> one Developer explores local code + implements -> targeted validation -> optional independent Reviewer when justified -> grouped repair/revalidation if needed -> Controller final check -> done`
 
 STANDARD rules:
 
 - **do not spawn an Explorer by default**;
-- the Developer performs local code search, call/data-flow reading, implementation, and validation in the same context;
+- preserve one Developer context for local search, call/data-flow reading, implementation, repair, and validation when practical;
 - use the lightweight task brief from `references/task-contract.md`;
 - worktree/staging/Agent Pool are off by default;
 - temporary branch and full commit-bound SHA state are optional;
@@ -93,7 +97,7 @@ STANDARD rules:
 
 Request an independent Reviewer when risk/uncertainty materially justifies it, including public behavior/API compatibility, persistence, security, concurrency/lifetime, weak tests, meaningful regression surface, or Developer uncertainty.
 
-If the Developer discovers that a key plan assumption is false, it must return the issue to the Controller rather than silently redesigning or expanding scope.
+If a consequential plan assumption is false, block only the dependent slice when safe; independent work that does not rely on that decision may continue. Return the decision to the Controller instead of silently changing architecture or expanding scope.
 
 If the task becomes multi-owner, dependency-heavy, hard to diagnose, broadly coupled, or high-blast-radius, upgrade to ORCHESTRATED.
 
@@ -103,7 +107,7 @@ Use ORCHESTRATED only when decomposition, parallelism, independent diagnosis, st
 
 Strong signals include:
 
-- multiple Developers can safely work in parallel;
+- multiple Developers can safely work in parallel and parallelism shortens the critical path;
 - a global dependency/hot-file map is needed before decomposition;
 - work crosses coupled subsystems/shared interfaces;
 - task ordering/base commits matter;
@@ -123,6 +127,12 @@ Explorer output should make decomposition clearer; it should not duplicate the d
 
 Use a separate Bug Investigator only when diagnosis itself is a substantial independent problem. Obvious/local bugs should be investigated by the same coding context that fixes them.
 
+### Parallel-delegation trigger
+
+When **two or more independent Ready tasks** lie on, unblock, or materially shorten the critical path, prefer parallel delegation if expected wall-clock savings exceed coordination, review, build, and merge costs.
+
+Do not rely on a model to volunteer parallelism. The Controller should explicitly delegate when this trigger is met, while avoiding hot-file conflicts and speculative fan-out.
+
 ### ORCHESTRATED planning and execution
 
 1. perform repository/Git preflight;
@@ -130,19 +140,20 @@ Use a separate Bug Investigator only when diagnosis itself is a substantial inde
 3. build dependency/ownership, critical-path, and risk plans;
 4. create a workflow-owned staging branch;
 5. decompose work into bounded tasks;
-6. for **each Developer task**, pass the Plan Readiness Gate; for High/Critical tasks also state a short set of Critical Invariants when useful;
+6. for **each Developer task**, pass the Plan Readiness Gate; for High/Critical tasks state only the Critical Invariants that materially constrain correctness;
 7. create task branches/worktrees and schedule Developers through Agent Pool only when parallelism shortens the critical path;
-8. use **GPT-5.6 Terra medium as the default Developer** for plan-ready tasks;
+8. route each Developer using `references/model-routing.md`;
 9. each Developer verifies local assumptions, implements narrowly, commits in meaningful batches, and performs scoped validation;
-10. run one **complete batch review** per task snapshot; collect material findings before returning them;
-11. route the finding batch to the Developer for one **batch repair** when practical, then revalidate and re-review the final repaired snapshot;
-12. if a second material review/repair cycle still produces substantial new findings, run a **Convergence Gate** before continuing;
-13. integrate accepted task snapshots into staging in dependency-safe order;
-14. run final staging validation using the Validation Pyramid and then Integration Review;
-15. batch integration findings/repairs when possible; run Convergence Gate if integration review churns;
-16. reconcile target drift and re-certify staging if needed;
-17. promote the certified staging result to the user target;
-18. clean workflow-created Git resources safely.
+10. preserve the Developer context for compatible repair work when practical instead of creating a fresh agent solely because a review found issues;
+11. run one **complete batch review** per task snapshot; collect material findings before returning them;
+12. route the finding batch to the Developer for one **batch repair** when practical, then revalidate and re-review the final repaired snapshot;
+13. if a second material review/repair cycle still produces substantial new findings, run a **Convergence Gate** before continuing;
+14. integrate accepted task snapshots into staging in dependency-safe order;
+15. run final staging validation using the Validation Pyramid and then Integration Review;
+16. batch integration findings/repairs when possible; run Convergence Gate if integration review churns;
+17. reconcile target drift and re-certify staging if needed;
+18. promote the certified staging result to the user target;
+19. clean workflow-created Git resources safely.
 
 For ORCHESTRATED work, read applicable references:
 
@@ -161,27 +172,87 @@ For ORCHESTRATED work, read applicable references:
 
 The Plan Readiness Gate is the main quality/cost control before delegated implementation.
 
-A task is ready when the Developer can answer **what to change and how to verify it** without having to make a new architectural decision.
+A task is ready when the Developer knows **what outcome is required, what boundary must be respected, and how success will be verified** without needing to make a consequential architectural/public-contract decision.
 
 Minimum fields:
 
 - Goal;
 - Scope;
-- Implementation approach;
+- Architectural decisions / hard constraints, if any;
 - Non-goals;
 - Validation.
 
-For High/Critical ORCHESTRATED work, add only the **Critical Invariants** that materially constrain correctness, normally no more than 5-10 concise items. Examples: atomic rollback, single-consumption receipt, revision mismatch rejection, compatibility preservation.
+For High/Critical ORCHESTRATED work, add only the **Critical Invariants** that materially constrain correctness, normally no more than 5-10 concise items.
 
-For ORCHESTRATED work, also include dependencies/base/integration fields and any important permissions or risk constraints.
+Do not over-specify routine implementation tactics that a capable Developer can resolve from repository conventions. Excessive pre-design duplicates work, increases token cost, and can prevent the implementation agent from using better local evidence.
 
-If the plan is not ready:
+For ORCHESTRATED work, also include dependencies/base/integration fields and important permissions or risk constraints.
 
-`Controller/repository analysis -> optional Explorer/Bug Investigator -> clarify solution -> PLAN_READY -> Developer`
+If the boundary is not ready:
+
+`Controller/repository analysis -> optional Explorer/Bug Investigator -> resolve consequential decisions -> PLAN_READY -> Developer`
 
 Do not use:
 
-`unclear plan -> stronger Developer guesses -> larger/uncontrolled diff`
+`unclear consequential boundary -> Developer silently redesigns architecture -> larger/uncontrolled diff`
+
+# Capability and model routing
+
+Read `references/model-routing.md` for the detailed policy.
+
+Use these routing dimensions:
+
+- `EXECUTION_AMBIGUITY` — how much consequential reasoning remains inside implementation;
+- `TASK_HORIZON` — Short / Medium / Long;
+- `INTEGRATION_BREADTH` — Local / Subsystem / Cross-system;
+- `COST_SENSITIVITY` — Low / Medium / High when it materially affects model choice;
+- `RISK_LEVEL` — controls governance/review strength, not Developer intelligence by itself.
+
+Default tendencies when models are available:
+
+- **bounded, plan-ready routine implementation** -> GPT-5.6 Terra medium;
+- **long-horizon, cross-system, materially ambiguous implementation** -> GPT-6 Astra medium/high;
+- **difficult unresolved semantics or repeated non-convergence** -> Astra high/xhigh/max as justified;
+- **cost-sensitive exploration/review** -> use lower-cost capable models when the evidence task is bounded;
+- **Astra unavailable** -> fall back to the strongest available GPT-5.6 path appropriate to the same capability requirement.
+
+Do not replace a good Terra path merely because Astra exists. Do not keep a weak model on a task whose dominant cost is repeated reasoning failure and rework.
+
+# Context continuity policy
+
+For long-running STANDARD or ORCHESTRATED work, preserving useful state can be more valuable than creating a fresh agent.
+
+When the runtime provides long-context/context-management/searchable-history capabilities:
+
+- prefer a long-lived Controller for orchestration state;
+- prefer keeping one Developer on implementation plus compatible repair work;
+- avoid repeating full Explorer/task context when the active agent can retrieve or already retains it;
+- summarize only stable boundaries, decisions, invariants, and handoff facts rather than duplicating full history;
+- split contexts for ownership/isolation/parallelism/review independence, not merely because the task has become long.
+
+Context continuity never overrides Git isolation, read-only review boundaries, independent-review value, or explicit task ownership.
+
+# Developer blocked-plan rule
+
+A Developer must not silently turn an implementation task into a consequential design task.
+
+When a key assumption is false:
+
+1. identify the dependent slice that cannot proceed safely;
+2. continue independent, reversible work only when it does not prejudge the decision;
+3. return or asynchronously ask for the smallest consequential decision needed when the runtime supports that interaction;
+4. resume the blocked slice after the Controller resolves the boundary.
+
+Report:
+
+- Expected;
+- Actual;
+- Impact;
+- Blocked slice;
+- Independent work that can safely continue, if any;
+- Decision needed.
+
+Do not stall the entire task for routine local choices that repository conventions can safely resolve.
 
 # Validation Pyramid
 
@@ -194,6 +265,8 @@ During implementation and repair, run the fastest checks that directly exercise 
 `affected target compile -> directly relevant tests/checks`
 
 Do not run the full project suite after every small edit unless the project makes that genuinely cheap or the failure mode requires it.
+
+Once the required targeted checks pass, stop expanding or repeating validation unless new changes, failures, or concrete unresolved risk invalidate that evidence.
 
 ## Task gate
 
@@ -214,7 +287,7 @@ Do not intentionally stop after the first non-BLOCKER issue. Group compatible fi
 Classify findings by both severity and disposition:
 
 - **Required Defect** — violates requirements, stated invariants, compatibility, or established correctness expectations; blocks according to severity;
-- **Contract Gap** — exposes an important missing/ambiguous requirement or invariant; Controller decides/replans before implementation continues;
+- **Contract Gap** — exposes an important missing/ambiguous requirement or invariant; Controller decides/replans before dependent implementation continues;
 - **Optional Hardening** — defensive improvement beyond the accepted contract; normally does not block;
 - **Deferred** — valid future work intentionally left outside the current task.
 
@@ -233,70 +306,16 @@ A second material repair/re-review cycle is allowed when justified, but if subst
 - Is the task boundary too broad or incorrectly split?
 - Is the Reviewer discovering new requirements rather than defects?
 - Is validation exposing a deeper root cause or architecture problem?
+- Is the current model/reasoning effort causing repeated reasoning failure that justifies capability escalation?
 
-The Controller must replan, split, defer optional hardening, or explicitly authorize another cycle. Do not continue an unbounded fix/test/review loop by default.
-
-# Developer model routing
-
-Developer routing is based primarily on **execution ambiguity**, not task risk.
-
-## Default
-
-`PLAN_READY -> GPT-5.6 Terra medium`
-
-Use Terra medium for ordinary production work, bounded multi-file changes, clear ORCHESTRATED subtasks, and even high-risk tasks when the implementation strategy is already explicit.
-
-## Escalate to Terra xhigh
-
-Escalate only when unresolved implementation reasoning remains, such as:
-
-- the contract conflicts materially with actual architecture;
-- multiple materially different implementation choices remain;
-- expected API/ownership/lifecycle assumptions are false;
-- repeated build/test failures do not converge;
-- unexpected cross-module coupling requires reasoning beyond a small Controller replan.
-
-Prefer replanning first when the decision belongs to the Controller.
-
-## Escalate to Terra max / Sol
-
-Use Terra max only for genuinely difficult implementation semantics such as unresolved concurrency/lifetime/state-machine interactions or similarly subtle correctness problems.
-
-Reserve Sol xhigh/max for Critical or repeatedly unresolved implementation work.
-
-Do not escalate Developer solely because `RISK_LEVEL` is High. Strengthen review/validation instead when the plan itself is clear.
-
-# Other role model routing
-
-Read `references/model-routing.md` when delegated roles are used.
-
-Defaults:
-
-- Explorer -> Luna max;
-- Bug Investigator -> Luna max / Terra xhigh / Terra max according to diagnosis difficulty;
-- Developer -> **Terra medium** when plan-ready;
-- Reviewer -> Luna max, escalating to Terra xhigh for high-risk/uncertain review;
-- Integration Reviewer -> Terra xhigh, escalating to Terra max for difficult/high-risk integration;
-- Sol -> Critical/repeatedly unresolved work.
-
-# Developer blocked-plan rule
-
-A Developer must not silently turn an implementation task into a design task.
-
-When a key assumption is false, return:
-
-- Expected;
-- Actual;
-- Impact;
-- Decision needed.
-
-The Controller replans. The task may then continue with Terra medium if the new plan is explicit.
+The Controller must replan, split, defer optional hardening, increase reasoning capability, or explicitly authorize another cycle. Do not continue an unbounded fix/test/review loop by default.
 
 # Bugfix routing
 
 - obvious/local/deterministic Bug -> FAST when safe;
 - one-owner non-trivial Bug -> STANDARD, same Developer investigates and fixes;
-- unknown/intermittent/cross-module/concurrency/lifetime/state-corruption Bug -> ORCHESTRATED and consider Bug Investigator.
+- unknown/intermittent/cross-module/concurrency/lifetime/state-corruption Bug -> ORCHESTRATED and consider Bug Investigator;
+- if diagnosis remains long-horizon or multi-hypothesis after bounded investigation, prefer Astra-class reasoning when available instead of serially spawning more weak diagnosis contexts.
 
 Never confuse symptom suppression with root-cause correction. Formal evidence should be proportional to uncertainty and risk.
 
@@ -308,7 +327,7 @@ Review intensity is proportional to risk and uncertainty:
 - STANDARD: independent Reviewer when justified, otherwise Controller final diff inspection;
 - ORCHESTRATED: independent per-task review and final Integration Review are normal gates.
 
-A Terra medium Developer does **not** automatically require a stronger Reviewer. Review tier depends on the defect-finding difficulty and risk of the change.
+Reviewer capability should match defect-finding difficulty and integration breadth, not merely the Developer model name.
 
 # Git policy
 
@@ -327,7 +346,8 @@ For long ORCHESTRATED tasks, the Controller should keep lightweight in-memory co
 - repair time;
 - validation/integration time;
 - number of Developers;
-- number of material review/repair cycles.
+- number of material review/repair cycles;
+- model/reasoning escalations that materially affected convergence.
 
 Do not create extra agents, repository files, or verbose logs solely for metrics. A concise final summary is enough. These metrics exist to identify future workflow bottlenecks.
 
